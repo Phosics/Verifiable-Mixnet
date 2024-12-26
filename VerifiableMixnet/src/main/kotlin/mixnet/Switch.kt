@@ -1,20 +1,23 @@
 package org.example.mixnet
 
-import java.math.BigInteger
+import mixnet.Vote
 import java.util.function.Function
 
-class Switch : Function<Pair<BigInteger, BigInteger>, Pair<BigInteger, BigInteger>> {
-    private var b = 0
+class Switch : Function<MutableList<Vote>, MutableList<Vote>> {
+    private var b = 1
 
     fun setB(b: Int) {
         this.b = b
     }
 
-    override fun apply(inputs: Pair<BigInteger, BigInteger>): Pair<BigInteger, BigInteger> {
-        if (b == 0) {
-            return Pair(inputs.first, inputs.second)
+    override fun apply(votes: MutableList<Vote>): MutableList<Vote> {
+        // TODO: Add shuffle
+        // TODO: Validate both lists are in size 2
+        if (b == 1) {
+            votes.reverse()
         }
 
-        return Pair(inputs.second, inputs.first)
+        return votes
+        // TODO: Add zero-knowledge proof
     }
 }
