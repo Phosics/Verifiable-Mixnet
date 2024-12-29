@@ -18,68 +18,86 @@ class PermutationNetwork(val n: Int) {
             firstCol = MutableList(n / 2) { Switch() }
             lastCol = MutableList(n / 2) { Switch() }
         } else {
+            // If n=2, we only have one switch
             switch = Switch()
         }
     }
 
-    private fun applyFirstColMap(votes: MutableList<Vote>): List<Vote> {
-        val result: MutableList<Vote> = MutableList(votes.size) { votes[it] } // Initialize with same size
-
-        // Iterate over the first half of the input list
-        for (i in 0 until votes.size / 2) {
-            result[i] = votes[2 * i]                  // Add even-indexed element
-            result[i + votes.size / 2] = votes[2 * i + 1] // Add odd-indexed element
-        }
-
-        return result
-    }
-
-    private fun applyLastColMap(votes: MutableList<Vote>): MutableList<Vote> {
-        val result: MutableList<Vote> = MutableList(votes.size) { votes[it] } // Initialize with same size
-
-        for (i in 0 until votes.size / 2) {
-            result[2 * i] = votes[i]                  // Map first half to even indices
-            result[2 * i + 1] = votes[i + votes.size / 2] // Map second half to odd indices
-        }
-
-        return result
-    }
-
-    private fun applyCol(votes: MutableList<Vote>, col: MutableList<Switch>): MutableList<Vote> {
-        val result: MutableList<Vote> = mutableListOf()
-
-        for (i in col.indices) {
-            val subVotes = votes.subList(2 * i, 2 * i + 2)
-            val appliedVote = col[i].apply(subVotes)
-            result.addAll(appliedVote)
-        }
-
-        return result
-    }
-
-    fun apply(votes: MutableList<Vote>) : MutableList<Vote>? {
+    /**
+     * Applies the entire permutation network to an immutable list of votes (size must be n).
+     * Returns a new list of votes.
+     */
+    fun apply(votes: List<Vote>): List<Vote> {
         if(n == 2) {
-            return switch?.apply(votes)
+            // Base case: single switch
+            return switch!!.apply(votes)
         }
 
-        val firstColRes = firstCol?.let { applyCol(votes, it) }
-            ?: throw IllegalStateException("First column application failed.")
+        // 1. Apply first column
+        val firstColResult = applyCol(votes, firstCol!!)
 
-        val firstColMappedVotes = applyFirstColMap(firstColRes).toMutableList()
+        // 2. Re-map wires for sub-networks
+        val firstColMapped = applyFirstColMap(firstColResult)
 
-        val topRes = top?.apply(firstColMappedVotes.subList(0, n / 2))
-            ?: throw IllegalStateException("Top network application failed.")
-        val bottomRes = bottom?.apply(firstColMappedVotes.subList(n / 2, n))
-            ?: throw IllegalStateException("Bottom network application failed.")
+        // 3. Recurse on top half and bottom half
+        val half = n / 2
+        val topInput = firstColMapped.subList(0, half)   // safe to read: creates a view
+        val bottomInput = firstColMapped.subList(half, n)
 
-        val combinedVotes = topRes + bottomRes
+        // Because subList returns a view, we create new lists if we want pure immutability:
+        val topResult = top!!.apply(topInput.toList())
+        val bottomResult = bottom!!.apply(bottomInput.toList())
 
-        val lastMapRes = applyLastColMap(combinedVotes.toMutableList())
+        // 4. Combine
+        val combined = topResult + bottomResult
 
-        val lastColRes = lastCol?.let { applyCol(lastMapRes, it) }
-            ?: throw IllegalStateException("Last column application failed.")
+        // 5. Re-map wires after sub-networks
+        val lastMapRes = applyLastColMap(combined)
 
-        return lastColRes
+        // 6. Apply last column
+        val lastColResult = applyCol(lastMapRes, lastCol!!)
+
+        return lastColResult
+    }
+
+    private fun applyCol(votes: List<Vote>, col: List<Switch>): List<Vote> {
+        val result = mutableListOf<Vote>()
+        for (i in col.indices) {
+            // Instead of subList, explicitly pick two votes
+            val subVotes = listOf(votes[2*i], votes[2*i + 1])
+
+            // Apply the switch
+            val applied = col[i].apply(subVotes)
+            // Append them
+            result.addAll(applied)
+        }
+        return result
+    }
+
+
+    private fun applyFirstColMap(votes: List<Vote>): List<Vote> {
+        val size = votes.size
+        val half = size / 2
+        val result = MutableList(size) { votes[it] }  // copy
+
+        for (i in 0 until half) {
+            result[i] = votes[2 * i]
+            result[i + half] = votes[2 * i + 1]
+        }
+        return result.toList()
+    }
+
+    private fun applyLastColMap(votes: List<Vote>): List<Vote> {
+        // Reverse of applyFirstColMap
+        val size = votes.size
+        val half = size / 2
+        val result = MutableList(size) { votes[it] }
+
+        for (i in 0 until half) {
+            result[2 * i] = votes[i]
+            result[2 * i + 1] = votes[i + half]
+        }
+        return result.toList()
     }
 
 }
