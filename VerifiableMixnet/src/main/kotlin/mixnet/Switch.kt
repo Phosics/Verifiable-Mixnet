@@ -3,7 +3,11 @@ package org.example.mixnet
 import mixnet.Vote
 import java.util.function.Function
 
-class Switch : Function<MutableList<Vote>, MutableList<Vote>> {
+/**
+ * A 2×2 Switch that either reverses or keeps order of two votes.
+ * Also intended to do re-encryption + ZKP.
+ */
+class Switch : Function<List<Vote>, List<Vote>> {
     private var b = 1
 
     // Set the switching flag
@@ -12,18 +16,22 @@ class Switch : Function<MutableList<Vote>, MutableList<Vote>> {
         this.b = b
     }
 
-    override fun apply(votes: MutableList<Vote>): MutableList<Vote> {
+    /**
+     * Apply the switch to an immutable list of exactly 2 votes.
+     * Returns a new immutable list of 2 votes.
+     */
+    override fun apply(votes: List<Vote>): List<Vote> {
         // Validate size
         require(votes.size == 2) { "Switch requires exactly 2 votes." }
 
         // Perform the switching operation
-        val result = if (b == 1) votes.reversed().toMutableList() else votes.toMutableList()
+        val swapped = if (b == 1) listOf(votes[1], votes[0]) else listOf(votes[0], votes[1])
 
         // TODO: Implement Zero-Knowledge Proof (ZKP) here
 
         // TODO: Add the randomness before the return
 
-        return result
+        return swapped
     }
 
     // TODO: Add method to generate zero-knowledge proofs for correctness

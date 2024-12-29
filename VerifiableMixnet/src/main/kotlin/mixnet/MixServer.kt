@@ -16,9 +16,10 @@ class MixServer(n: Int) {
     }
 
     /**
-     * Running:
+     * Applies the permutation network to the given votes (size = n).
+     * Returns a new list of permuted/re-encrypted votes.
      */
-    fun apply(votes: MutableList<Vote>): MutableList<Vote>? {
+    fun apply(votes: List<Vote>): List<Vote> {
         return permutationNetwork.apply(votes)
     }
 
