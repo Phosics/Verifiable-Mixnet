@@ -2,7 +2,7 @@ package mixnet
 
 import java.math.BigInteger
 
-class Vote(
+data class Vote(
     private val cipherText: BigInteger,
     private val gr: BigInteger,
     private val modulus: BigInteger // TODO: added by Guy, ensure correct arithmetic calculation
@@ -15,7 +15,7 @@ class Vote(
         // Note: add randomness return a new object, and doesn't change the original one
         val newCipherText = cipherText.multiply(randomness).mod(modulus)
         val newGR = gr.multiply(randomness).mod(modulus)
-        return Vote(newCipherText, newGR, modulus)
+        return copy(cipherText = newCipherText, gr = newGR)
     }
 
 }
