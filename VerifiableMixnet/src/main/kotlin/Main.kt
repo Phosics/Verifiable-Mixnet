@@ -2,20 +2,25 @@ package org.example
 
 import mixnet.MixServer
 import mixnet.Vote
+import mixnet.PermutationNetwork
 import java.math.BigInteger
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+
 fun main() {
-    var mixServer = MixServer(4)
-    print(mixServer)
+    val mixServer = MixServer(4)
 
-    var votes : MutableList<Vote> = mutableListOf()
-    votes.add(Vote(BigInteger.ONE, BigInteger.ONE))
-    votes.add(Vote(BigInteger.TWO, BigInteger.TWO))
-    votes.add(Vote(BigInteger.valueOf(3), BigInteger.valueOf(3)))
-    votes.add(Vote(BigInteger.valueOf(4), BigInteger.valueOf(4)))
+    val votes: MutableList<Vote> = mutableListOf(
+        Vote(BigInteger.valueOf(0), BigInteger.valueOf(0), BigInteger.valueOf(128)),
+        Vote(BigInteger.valueOf(1), BigInteger.valueOf(1), BigInteger.valueOf(128)),
+        Vote(BigInteger.valueOf(2), BigInteger.valueOf(2), BigInteger.valueOf(128)),
+        Vote(BigInteger.valueOf(3), BigInteger.valueOf(3), BigInteger.valueOf(128))
+    )
 
-    var res = mixServer.apply(votes)
-    print(res)
+    println("Initial Votes:")
+    votes.forEachIndexed { index, vote -> println("Vote $index: ${vote.getCipherText()}") }
+
+    val result = mixServer.apply(votes)
+
+    println("\nFinal Shuffled Votes:")
+    result?.forEachIndexed { index, vote -> println("Vote $index: ${vote.getCipherText()}") }
 }

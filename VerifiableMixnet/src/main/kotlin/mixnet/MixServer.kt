@@ -21,4 +21,5 @@ class MixServer(n: Int) {
     fun apply(votes: MutableList<Vote>): MutableList<Vote>? {
         return permutationNetwork.apply(votes)
     }
+
 }
