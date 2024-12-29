@@ -8,13 +8,15 @@ import java.util.function.Function
  * Also intended to do re-encryption + ZKP.
  */
 class Switch : Function<List<Vote>, List<Vote>> {
-    private var b = 1
+    private var b = 0
 
     // Set the switching flag
     fun setB(b: Int) {
         require(b == 0 || b == 1) { "Switch value b must be 0 or 1." }
         this.b = b
     }
+
+    fun getB(): Int {return this.b}
 
     /**
      * Apply the switch to an immutable list of exactly 2 votes.
