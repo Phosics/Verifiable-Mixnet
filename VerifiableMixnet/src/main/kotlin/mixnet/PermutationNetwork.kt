@@ -13,14 +13,28 @@ class PermutationNetwork(val n: Int) {
         require(n > 0 && (n and (n - 1)) == 0) { "n must be a power of 2." }
 
         if (n > 2) {
-            top = PermutationNetwork(n / 2)
-            bottom = PermutationNetwork(n / 2)
-            firstCol = MutableList(n / 2) { Switch() }
-            lastCol = MutableList(n / 2) { Switch() }
+            initializeSubNetworks()
+            initializeColumns()
         } else {
             // If n=2, we only have one switch
             switch = Switch()
         }
+    }
+
+    /**
+     * Initializes the top and bottom sub-networks.
+     */
+    private fun initializeSubNetworks() {
+        top = PermutationNetwork(n / 2)
+        bottom = PermutationNetwork(n / 2)
+    }
+
+    /**
+     * Initializes the first and last column switches.
+     */
+    private fun initializeColumns() {
+        firstCol = MutableList(n / 2) { Switch() }
+        lastCol = MutableList(n / 2) { Switch() }
     }
 
     /**
@@ -40,16 +54,10 @@ class PermutationNetwork(val n: Int) {
         val firstColMapped = applyFirstColMap(firstColResult)
 
         // 3. Recurse on top half and bottom half
-        val half = n / 2
-        val topInput = firstColMapped.subList(0, half)   // safe to read: creates a view
-        val bottomInput = firstColMapped.subList(half, n)
+        val topResult = applySubNetworks(firstColMapped)
 
-        // Because subList returns a view, we create new lists if we want pure immutability:
-        val topResult = top!!.apply(topInput.toList())
-        val bottomResult = bottom!!.apply(bottomInput.toList())
-
-        // 4. Combine
-        val combined = topResult + bottomResult
+        // 4. Combine results from sub-networks
+        val combined = combineResults(topResult)
 
         // 5. Re-map wires after sub-networks
         val lastMapRes = applyLastColMap(combined)
@@ -60,21 +68,26 @@ class PermutationNetwork(val n: Int) {
         return lastColResult
     }
 
+    /**
+     * Applies a column of switches to the provided votes.
+     */
     private fun applyCol(votes: List<Vote>, col: List<Switch>): List<Vote> {
         val result = mutableListOf<Vote>()
         for (i in col.indices) {
-            // Instead of subList, explicitly pick two votes
-            val subVotes = listOf(votes[2*i], votes[2*i + 1])
+            // Explicitly pick two votes
+            val subVotes = listOf(votes[2 * i], votes[2 * i + 1])
 
             // Apply the switch
             val applied = col[i].apply(subVotes)
-            // Append them
+            // Append the results
             result.addAll(applied)
         }
         return result
     }
 
-
+    /**
+     * Maps the first column's result to prepare inputs for sub-networks.
+     */
     private fun applyFirstColMap(votes: List<Vote>): List<Vote> {
         val size = votes.size
         val half = size / 2
@@ -87,6 +100,9 @@ class PermutationNetwork(val n: Int) {
         return result.toList()
     }
 
+    /**
+     * Maps the last column's result to finalize the permutation.
+     */
     private fun applyLastColMap(votes: List<Vote>): List<Vote> {
         // Reverse of applyFirstColMap
         val size = votes.size
@@ -100,6 +116,30 @@ class PermutationNetwork(val n: Int) {
         return result.toList()
     }
 
+    /**
+     * Applies the permutation to the sub-networks and returns their results.
+     */
+    private fun applySubNetworks(firstColMapped: List<Vote>): Pair<List<Vote>, List<Vote>> {
+        val half = n / 2
+        val topInput = firstColMapped.subList(0, half)   // Safe to read: creates a view
+        val bottomInput = firstColMapped.subList(half, n)
+
+        // Because subList returns a view, create new lists for immutability
+        val topResult = top!!.apply(topInput.toList())
+        val bottomResult = bottom!!.apply(bottomInput.toList())
+
+        return Pair(topResult, bottomResult)
+    }
+
+    /**
+     * Combines the results from the top and bottom sub-networks.
+     */
+    private fun combineResults(subResults: Pair<List<Vote>, List<Vote>>): List<Vote> {
+        val (topVotes, bottomVotes) = subResults
+        return topVotes + bottomVotes
+    }
+
+
     // ----------------------------------------------------------------
     //           WAKSMAN CONFIGURATION
     // ----------------------------------------------------------------
@@ -110,9 +150,8 @@ class PermutationNetwork(val n: Int) {
      *
      * Implements the Waksman algorithm (Steps 1–3), then recurses on top/bottom.
      */
-    fun configNetBySigma(sigma: IntArray) {
-        require(sigma.size == n) { "Permutation size must match n=$n" }
-        require(isValidPermutation(sigma)) { "sigma must be a valid permutation." }
+    fun configNetBySigma(sigma: IntArray){
+        validateSigma(sigma)
 
         // Base case: n = 2 => single switch
         if (n == 2) {
@@ -128,6 +167,24 @@ class PermutationNetwork(val n: Int) {
         val F = BooleanArray(n) { false } // F[i] is true if O_i has been processed
 
         // Step 3: Repeat Step 1-2 until all flags are set
+        configureSwitches(sigma, F)
+
+        // Step 4: Recursively configure the top and bottom sub-networks
+        configureSubNetworks(sigma, firstCol, lastCol)
+    }
+
+    /**
+     * Validates the permutation sigma.
+     */
+    private fun validateSigma(sigma: IntArray) {
+        require(sigma.size == n) { "Permutation size must match n=$n" }
+        require(isValidPermutation(sigma)) { "sigma must be a valid permutation." }
+    }
+
+    /**
+     * Configures the switches based on the Waksman algorithm steps.
+     */
+    private fun configureSwitches(sigma: IntArray, F: BooleanArray) {
         while (true) {
             // Step 1: Find the smallest unset i
             val i = F.indexOfFirst { !it }
@@ -135,7 +192,7 @@ class PermutationNetwork(val n: Int) {
 
             // Step 1: If i is the first index, set the corresponding last column switch arbitrarily
             if (i == 0) {
-                lastCol[0].setB(0)
+                lastCol!![0].setB(0)
             }
 
             var currentI = i
@@ -147,7 +204,7 @@ class PermutationNetwork(val n: Int) {
                 // j is the input index connected to O_i via the last column switch.
                 var switchIndex = currentI / 2
 
-                val j = if (lastCol[switchIndex].getB() == 0) {
+                val j = if (lastCol!![switchIndex].getB() == 0) {
                     currentI
                 } else {
                     partnerWire(currentI)
@@ -156,14 +213,14 @@ class PermutationNetwork(val n: Int) {
                 // Step 2-3: Let k = sigma[i]
                 val k = sigma[currentI]
                 if (oneEvenOneOdd(j, k)) {
-                    firstCol[k / 2].setB(1)
+                    firstCol!![k / 2].setB(1)
                 }
 
                 // Step 2-4: Identify l such that ˜O_l = I_k
                 val kBar = partnerWire(k)
                 switchIndex = kBar / 2
 
-                val l = if (firstCol[switchIndex].getB() == 0) {
+                val l = if (firstCol!![switchIndex].getB() == 0) {
                     kBar
                 } else {
                     partnerWire(kBar)
@@ -176,7 +233,7 @@ class PermutationNetwork(val n: Int) {
                 }
 
                 if (oneEvenOneOdd(t, l)) {
-                    lastCol[t / 2].setB(1)
+                    lastCol!![t / 2].setB(1)
                 }
 
                 // Step 2-6: Mark F[t] and set currentI to partnerWire(t)
@@ -189,11 +246,44 @@ class PermutationNetwork(val n: Int) {
                 currentI = tBar
             }
         }
+    }
 
-        // Step 4: Recursively configure the top and bottom sub-networks
-        // Built by constructing O and I arrays from first and last column switches
-
+    /**
+     * Configures the top and bottom sub-networks based on the configured switches.
+     */
+    private fun configureSubNetworks(sigma: IntArray, firstCol: MutableList<Switch>, lastCol: MutableList<Switch>) {
         // Step 4.1: Build the OBar array based on the first column switches
+        val OBar = buildOBar(firstCol)
+
+        // Step 4.2: Apply mapping to OBar
+        val OBarMapped = applyOBarMap(OBar)
+
+        // Step 4.3: Build the IBar array based on the last column switches
+        val IBar = buildIBar(lastCol, sigma)
+
+        // Step 4.4: Apply mapping to IBar
+        val IBarMapped = applyIBarMap(IBar)
+
+        // Step 4.5: Initialize top and bottom permutation arrays
+        val (topPermutation, bottomPermutation) = assignSubPermutations(OBarMapped, IBarMapped)
+
+        // Step 4.6: Debugging: Print the top and bottom permutations
+        println("Top Permutation: ${topPermutation.toList()}")
+        println("Bottom Permutation: ${bottomPermutation.toList()}")
+
+        // Step 4.7: Validate that topPermutation and bottomPermutation are valid permutations
+        require(isValidSubPermutation(topPermutation)) { "Top permutation is invalid: ${topPermutation.toList()}" }
+        require(isValidSubPermutation(bottomPermutation)) { "Bottom permutation is invalid: ${bottomPermutation.toList()}" }
+
+        // Step 4.8: Recursively configure the sub-networks
+        top!!.configNetBySigma(topPermutation)
+        bottom!!.configNetBySigma(bottomPermutation)
+    }
+
+    /**
+     * Builds the OBar array based on the first column switches.
+     */
+    private fun buildOBar(firstCol: MutableList<Switch>): IntArray {
         val OBar = IntArray(n) { 0 }
         for (switchIndex in 0 until n / 2) {
             val bFirst = firstCol[switchIndex].getB()
@@ -207,11 +297,13 @@ class PermutationNetwork(val n: Int) {
                 OBar[2 * switchIndex + 1] = 2 * switchIndex
             }
         }
+        return OBar
+    }
 
-        // Step 4.2: Apply mapping to OBar
-        val OBarMapped = applyOBarMap(OBar)
-
-        // Step 4.3: Build the IBar array based on the last column switches
+    /**
+     * Builds the IBar array based on the last column switches and the permutation sigma.
+     */
+    private fun buildIBar(lastCol: MutableList<Switch>, sigma: IntArray): IntArray {
         val IBar = IntArray(n) { 0 }
         for (switchIndex in 0 until n / 2) {
             val bLast = lastCol[switchIndex].getB()
@@ -226,18 +318,20 @@ class PermutationNetwork(val n: Int) {
             }
         }
 
+        // Apply permutation sigma to IBar
         for (j in 0 until n) {
             IBar[j] = sigma[IBar[j]]
         }
+        return IBar
+    }
 
-        // Step 4.4: Apply mapping to IBar
-        val IBarMapped = applyIBarMap(IBar)
-
-        // Step 4.5: Initialize top and bottom permutation arrays
+    /**
+     * Assigns the top and bottom sub-permutations based on OBarMapped and IBarMapped.
+     */
+    private fun assignSubPermutations(OBarMapped: IntArray, IBarMapped: IntArray): Pair<IntArray, IntArray> {
         val topPermutation = IntArray(n / 2)
         val bottomPermutation = IntArray(n / 2)
 
-        // Step 4.6: Assign to topPermutation and bottomPermutation based on OBarMapped and IBarMapped
         for (j in 0 until n) {
             val I_j = IBarMapped[j] // IBarMapped[j] is the input connected via the last column
 
@@ -247,27 +341,17 @@ class PermutationNetwork(val n: Int) {
                 throw IllegalArgumentException("No corresponding OBarMapped[i] found for IBarMapped[j] = $I_j")
             }
 
-            // Assign to topPermutation or bottomPermutation based on i
+            // Assign to topPermutation or bottomPermutation based on j
             if (j < n / 2) {
                 // Assign to topPermutation
                 topPermutation[j] = O_j
             } else {
                 // Assign to bottomPermutation
-                bottomPermutation[j - (n/2)] = O_j - (n/2)
+                bottomPermutation[j - (n / 2)] = O_j - (n / 2)
             }
         }
 
-        // Step 4.7: Debugging: Print the top and bottom permutations
-        println("Top Permutation: ${topPermutation.toList()}")
-        println("Bottom Permutation: ${bottomPermutation.toList()}")
-
-        // Step 4.8: Validate that topPermutation and bottomPermutation are valid permutations
-        require(isValidSubPermutation(topPermutation)) { "Top permutation is invalid: ${topPermutation.toList()}" }
-        require(isValidSubPermutation(bottomPermutation)) { "Bottom permutation is invalid: ${bottomPermutation.toList()}" }
-
-        // Step 4.9: Recursively configure the sub-networks
-        top!!.configNetBySigma(topPermutation)
-        bottom!!.configNetBySigma(bottomPermutation)
+        return Pair(topPermutation, bottomPermutation)
     }
 
     /**
@@ -288,8 +372,9 @@ class PermutationNetwork(val n: Int) {
     // ----------------------------------------------------------------
 
     /**
-     * Partner wire means if i is even => i+1, if i is odd => i-1.
-     * Ensures that the partner wire stays within bounds.
+     * Identifies the partner wire.
+     * If i is even, returns i + 1; if odd, returns i - 1.
+     * Throws an exception if out of bounds.
      */
     private fun partnerWire(i: Int): Int {
         return when {
@@ -329,21 +414,18 @@ class PermutationNetwork(val n: Int) {
         return true
     }
 
-    
     /**
      * Base case: n=2 => we have one switch; set b=0 if sigma=[0,1], b=1 if sigma=[1,0].
      */
     private fun configBaseCase(sigma: IntArray) {
-        if (sigma.size!=2) error("Base case invoked with n!=2")
+        if (sigma.size != 2) error("Base case invoked with n!=2")
         val sw = switch ?: error("switch==null in baseCase")
 
         val (s0, s1) = sigma
-        if (s0==0 && s1==1) {
-            sw.setB(0)
-        } else if (s0==1 && s1==0) {
-            sw.setB(1)
-        } else {
-            throw IllegalArgumentException("Invalid sigma for n=2: ${sigma.toList()}")
+        when {
+            s0 == 0 && s1 == 1 -> sw.setB(0)
+            s0 == 1 && s1 == 0 -> sw.setB(1)
+            else -> throw IllegalArgumentException("Invalid sigma for n=2: ${sigma.toList()}")
         }
     }
 
@@ -382,6 +464,5 @@ class PermutationNetwork(val n: Int) {
 
         return result
     }
-
 
 }
