@@ -268,8 +268,8 @@ class PermutationNetwork(val n: Int) {
         val (topPermutation, bottomPermutation) = assignSubPermutations(OBarMapped, IBarMapped)
 
         // Step 4.6: Debugging: Print the top and bottom permutations
-        println("Top Permutation: ${topPermutation.toList()}")
-        println("Bottom Permutation: ${bottomPermutation.toList()}")
+        // println("Top Permutation: ${topPermutation.toList()}")
+        // println("Bottom Permutation: ${bottomPermutation.toList()}")
 
         // Step 4.7: Validate that topPermutation and bottomPermutation are valid permutations
         require(isValidSubPermutation(topPermutation)) { "Top permutation is invalid: ${topPermutation.toList()}" }
