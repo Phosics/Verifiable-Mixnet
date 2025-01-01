@@ -144,12 +144,13 @@ class PermutationNetwork(val n: Int) {
                 F[currentI] = true
 
                 // Step 2-2: Identify j such that ˜I_j = O_i
-                // After the first column, O_i is connected to one of two inputs.
-                // j is the input index connected to O_i via the first column switch.
-                val j = if (firstCol[currentI / 2].getB() == 0) {
-                    2 * (currentI / 2)
+                // j is the input index connected to O_i via the last column switch.
+                var switchIndex = currentI / 2
+
+                val j = if (lastCol[switchIndex].getB() == 0) {
+                    currentI
                 } else {
-                    2 * (currentI / 2) + 1
+                    partnerWire(currentI)
                 }
 
                 // Step 2-3: Let k = sigma[i]
@@ -159,10 +160,17 @@ class PermutationNetwork(val n: Int) {
                 }
 
                 // Step 2-4: Identify l such that ˜O_l = I_k
-                val l = partnerWire(k)
+                val kBar = partnerWire(k)
+                switchIndex = kBar / 2
+
+                val l = if (firstCol[switchIndex].getB() == 0) {
+                    kBar
+                } else {
+                    partnerWire(kBar)
+                }
 
                 // Step 2-5: Find t such that sigma[t] = l
-                val t = findInverse(sigma, l)
+                val t = findInverse(sigma, kBar)
                 if (t == -1) {
                     throw IllegalArgumentException("No t found such that sigma[t] = $l")
                 }
@@ -183,65 +191,97 @@ class PermutationNetwork(val n: Int) {
         }
 
         // Step 4: Recursively configure the top and bottom sub-networks
-        // Corrected Permutation Splitting Logic
+        // Built by constructing O and I arrays from first and last column switches
 
-        // Initialize top and bottom permutation arrays
-        val topPermutation = IntArray(n / 2)
-        val bottomPermutation = IntArray(n / 2)
-        var topIdx = 0
-        var bottomIdx = 0
-
-        for (i in 0 until n) {
-            // Determine which sub-network the input i is connected to
-            val inputSwitchIndex = i / 2
-            val bFirst = firstCol[inputSwitchIndex].getB()
-            val subNetInput = if (bFirst == 0) {
-                "top"
+        // Step 4.1: Build the OBar array based on the first column switches
+        val OBar = IntArray(n) { 0 }
+        for (switchIndex in 0 until n / 2) {
+            val bFirst = firstCol[switchIndex].getB()
+            if (bFirst == 0) {
+                // Switch is straight: OBar[2*s] = 2*s, OBar[2*s +1] = 2*s +1
+                OBar[2 * switchIndex] = 2 * switchIndex
+                OBar[2 * switchIndex + 1] = 2 * switchIndex + 1
             } else {
-                "bottom"
-            }
-
-            // Determine which sub-network the output sigma[i] is connected to
-            val outputSwitchIndex = sigma[i] / 2
-            val bLast = lastCol[outputSwitchIndex].getB()
-            val subNetOutput = if (bLast == 0) {
-                "top"
-            } else {
-                "bottom"
-            }
-
-            // Ensure that input and output are routed to the same sub-network
-            if (subNetInput != subNetOutput) {
-                throw IllegalArgumentException("Mismatch in sub-network routing for input $i and output ${sigma[i]}.")
-            }
-
-            // Assign to top or bottom permutation based on sub-network
-            if (subNetInput == "top") {
-                if (topIdx >= n / 2) {
-                    throw IllegalArgumentException("Top permutation index out of bounds.")
-                }
-                topPermutation[topIdx++] = sigma[i] % (n / 2)
-            } else {
-                if (bottomIdx >= n / 2) {
-                    throw IllegalArgumentException("Bottom permutation index out of bounds.")
-                }
-                bottomPermutation[bottomIdx++] = sigma[i] % (n / 2)
+                // Switch is crossed: OBar[2*s] = 2*s +1, OBar[2*s +1] = 2*s
+                OBar[2 * switchIndex] = 2 * switchIndex + 1
+                OBar[2 * switchIndex + 1] = 2 * switchIndex
             }
         }
 
-        // Debugging: Print the top and bottom permutations
+        // Step 4.2: Apply mapping to OBar
+        val OBarMapped = applyOBarMap(OBar)
+
+        // Step 4.3: Build the IBar array based on the last column switches
+        val IBar = IntArray(n) { 0 }
+        for (switchIndex in 0 until n / 2) {
+            val bLast = lastCol[switchIndex].getB()
+            if (bLast == 0) {
+                // Switch is straight: IBar[2*s] = 2*s, IBar[2*s +1] = 2*s +1
+                IBar[2 * switchIndex] = 2 * switchIndex
+                IBar[2 * switchIndex + 1] = 2 * switchIndex + 1
+            } else {
+                // Switch is crossed: IBar[2*s] = 2*s +1, IBar[2*s +1] = 2*s
+                IBar[2 * switchIndex] = 2 * switchIndex + 1
+                IBar[2 * switchIndex + 1] = 2 * switchIndex
+            }
+        }
+
+        for (j in 0 until n) {
+            IBar[j] = sigma[IBar[j]]
+        }
+
+        // Step 4.4: Apply mapping to IBar
+        val IBarMapped = applyIBarMap(IBar)
+
+        // Step 4.5: Initialize top and bottom permutation arrays
+        val topPermutation = IntArray(n / 2)
+        val bottomPermutation = IntArray(n / 2)
+
+        // Step 4.6: Assign to topPermutation and bottomPermutation based on OBarMapped and IBarMapped
+        for (j in 0 until n) {
+            val I_j = IBarMapped[j] // IBarMapped[j] is the input connected via the last column
+
+            // Find i such that OBarMapped[i] == I_j
+            val O_j = OBarMapped.indexOf(I_j)
+            if (O_j == -1) {
+                throw IllegalArgumentException("No corresponding OBarMapped[i] found for IBarMapped[j] = $I_j")
+            }
+
+            // Assign to topPermutation or bottomPermutation based on i
+            if (j < n / 2) {
+                // Assign to topPermutation
+                topPermutation[j] = O_j
+            } else {
+                // Assign to bottomPermutation
+                bottomPermutation[j - (n/2)] = O_j - (n/2)
+            }
+        }
+
+        // Step 4.7: Debugging: Print the top and bottom permutations
         println("Top Permutation: ${topPermutation.toList()}")
         println("Bottom Permutation: ${bottomPermutation.toList()}")
 
-        // Ensure that topPermutation and bottomPermutation are valid permutations
+        // Step 4.8: Validate that topPermutation and bottomPermutation are valid permutations
         require(isValidSubPermutation(topPermutation)) { "Top permutation is invalid: ${topPermutation.toList()}" }
         require(isValidSubPermutation(bottomPermutation)) { "Bottom permutation is invalid: ${bottomPermutation.toList()}" }
 
-        // Recursively configure the sub-networks
+        // Step 4.9: Recursively configure the sub-networks
         top!!.configNetBySigma(topPermutation)
         bottom!!.configNetBySigma(bottomPermutation)
     }
 
+    /**
+     * Validates if the provided subSigma array is a valid permutation of [0, size-1].
+     */
+    private fun isValidSubPermutation(subSigma: IntArray): Boolean {
+        val size = subSigma.size
+        val seen = BooleanArray(size) { false }
+        for (num in subSigma) {
+            if (num < 0 || num >= size || seen[num]) return false
+            seen[num] = true
+        }
+        return true
+    }
 
     // ----------------------------------------------------------------
     // Helper functions for Waksman logic
@@ -289,18 +329,6 @@ class PermutationNetwork(val n: Int) {
         return true
     }
 
-    /**
-     * Validates if the provided subSigma array is a valid permutation of [0, size-1].
-     */
-    private fun isValidSubPermutation(subSigma: IntArray): Boolean {
-        val size = subSigma.size
-        val seen = BooleanArray(size) { false }
-        for (num in subSigma) {
-            if (num < 0 || num >= size || seen[num]) return false
-            seen[num] = true
-        }
-        return true
-    }
     
     /**
      * Base case: n=2 => we have one switch; set b=0 if sigma=[0,1], b=1 if sigma=[1,0].
@@ -317,6 +345,42 @@ class PermutationNetwork(val n: Int) {
         } else {
             throw IllegalArgumentException("Invalid sigma for n=2: ${sigma.toList()}")
         }
+    }
+
+    /**
+     * Applies the first column mapping to the OBar array.
+     * @param OBar The original OBar array.
+     * @return The mapped OBar array.
+     */
+    private fun applyOBarMap(OBar: IntArray): IntArray {
+        val size = OBar.size
+        val half = size / 2
+        val result = IntArray(size) { 0 }
+
+        for (i in 0 until half) {
+            result[i] = OBar[2 * i]
+            result[i + half] = OBar[2 * i + 1]
+        }
+
+        return result
+    }
+
+    /**
+     * Applies the last column mapping to the IBar array.
+     * @param IBar The original IBar array.
+     * @return The mapped IBar array.
+     */
+    private fun applyIBarMap(IBar: IntArray): IntArray {
+        val size = IBar.size
+        val half = size / 2
+        val result = IntArray(size) { 0 }
+
+        for (i in 0 until half) {
+            result[2 * i] = IBar[i]
+            result[2 * i + 1] = IBar[i + half]
+        }
+
+        return result
     }
 
 }

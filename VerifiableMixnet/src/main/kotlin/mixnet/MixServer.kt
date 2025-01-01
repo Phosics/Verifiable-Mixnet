@@ -45,7 +45,9 @@ class MixServer(private val n: Int) {
      * Public method: chooses a random permutation and configures the network accordingly.
      */
     fun configureRandomly() {
-        val sigma = randomPermutation(n)
+        var sigma = randomPermutation(n)
+//        sigma = intArrayOf(2,0,3,1)
+        // TODO: delete above
         println("Sigma: ${sigma.contentToString()}")
         permutationNetwork.configNetBySigma(sigma)
     }
