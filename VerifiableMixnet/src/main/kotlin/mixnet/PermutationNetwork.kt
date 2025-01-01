@@ -376,11 +376,12 @@ class PermutationNetwork(val n: Int) {
         val result = IntArray(size) { 0 }
 
         for (i in 0 until half) {
-            result[2 * i] = IBar[i]
-            result[2 * i + 1] = IBar[i + half]
+            result[i] = IBar[2 * i]
+            result[i + half] = IBar[2 * i + 1]
         }
 
         return result
     }
+
 
 }
