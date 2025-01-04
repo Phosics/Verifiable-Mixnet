@@ -1,11 +1,5 @@
 package org.example
 
-import mixnet.MixServer
-import mixnet.MixServersManager
-import mixnet.Vote
-import mixnet.PermutationNetwork
-import java.math.BigInteger
-
 import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters

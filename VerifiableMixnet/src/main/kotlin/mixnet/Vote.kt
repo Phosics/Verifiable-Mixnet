@@ -1,4 +1,4 @@
-package mixnet
+package org.example.mixnet
 
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.example.crypto.ElGamal

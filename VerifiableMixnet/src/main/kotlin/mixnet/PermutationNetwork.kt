@@ -1,6 +1,8 @@
 package mixnet
 
 import org.example.mixnet.Switch
+import org.example.mixnet.Vote
+
 
 class PermutationNetwork(val n: Int) {
     private var switch: Switch? = null

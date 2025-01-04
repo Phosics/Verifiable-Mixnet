@@ -8,6 +8,7 @@ import meerkat.protobuf.groupElement
 import meerkat.protobuf.rerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint
+import org.bouncycastle.util.encoders.Hex
 
 /**
  * CryptoUtils provides utility functions for serializing and deserializing
@@ -83,5 +84,12 @@ object CryptoUtils {
      */
     fun deserializeCiphertext(data: ByteArray): ElGamalCiphertext {
         return ElGamalCiphertext.parseFrom(data)
+    }
+
+    /**
+     * Extension function to convert ByteString to Hex string.
+     */
+    fun ByteString.toHex(): String {
+        return Hex.toHexString(this.toByteArray())
     }
 }

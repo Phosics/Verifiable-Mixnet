@@ -1,6 +1,6 @@
 package mixnet
 
-import mixnet.Vote
+import org.example.mixnet.Vote
 import org.example.toHex
 import java.util.*
 
@@ -20,7 +20,7 @@ class MixServersManager(private val t: Int, private val n: Int) {
 
         // Initialize 2t + 1 MixServer instances
         mixServers = List(numServers) { index ->
-            println("Initializing MixServer ${index + 1}/$numServers with n=$n")
+//            println("Initializing MixServer ${index + 1}/$numServers with n=$n")
             MixServer(n)
         }
     }
@@ -39,7 +39,7 @@ class MixServersManager(private val t: Int, private val n: Int) {
         var currentVotes = votes
         mixServers.forEachIndexed { index, server ->
             server.configureRandomly()
-            println("Applying MixServer ${index + 1}/$numServers")
+//            println("Applying MixServer ${index + 1}/$numServers")
             currentVotes = server.apply(currentVotes)
 //            println("After MixServer ${index + 1}/$numServers: ${currentVotes.map { it.getEncryptedMessage().data.toHex() }}")
         }

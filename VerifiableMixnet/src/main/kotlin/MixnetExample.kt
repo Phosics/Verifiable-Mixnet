@@ -2,7 +2,7 @@ package org.example
 
 import meerkat.protobuf.ConcreteCrypto
 import mixnet.MixServersManager
-import mixnet.Vote
+import org.example.mixnet.Vote
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -74,7 +74,7 @@ fun main() {
 
     // (Optional) Decrypt the mixed votes to verify correctness
     println("\nDecrypting Mixed Votes for Verification:")
-    mixedVotes.forEachIndexed { index, vote ->
+    mixedVotes.forEachIndexed { index, vote: Vote ->
         val decryptedMessage = ElGamal.decrypt(
             CryptoConfig.getPrivateKey(keyPair),
             vote.getEncryptedMessage(),

@@ -1,6 +1,7 @@
 package mixnet
 
 import org.example.mixnet.Switch
+import org.example.mixnet.Vote
 import java.util.*
 
 class MixServer(private val n: Int) {
@@ -48,7 +49,7 @@ class MixServer(private val n: Int) {
         var sigma = randomPermutation(n)
 //        sigma = intArrayOf(2,0,3,1)
         // TODO: delete above
-        println("Sigma: ${sigma.contentToString()}")
+//        println("Sigma: ${sigma.contentToString()}")
         permutationNetwork.configNetBySigma(sigma)
     }
 

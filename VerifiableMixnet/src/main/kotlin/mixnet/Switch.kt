@@ -1,6 +1,6 @@
 package org.example.mixnet
 
-import mixnet.Vote
+import org.example.mixnet.Vote
 import java.util.function.Function
 
 /**
