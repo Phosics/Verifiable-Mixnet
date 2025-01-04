@@ -22,7 +22,6 @@ object CryptoConfig {
 
     /**
      * The name of the elliptic curve to be used.
-     * You can choose a standardized curve like secp256r1 or secp256k1.
      */
     private const val EC_CURVE_NAME = "secp256r1"
 
