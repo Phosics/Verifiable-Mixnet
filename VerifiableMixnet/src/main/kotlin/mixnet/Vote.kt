@@ -1,21 +1,44 @@
 package mixnet
 
-import java.math.BigInteger
+import org.bouncycastle.jce.interfaces.ECPublicKey
+import org.example.crypto.ElGamal
+import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
+import org.bouncycastle.crypto.params.ECDomainParameters
 
+/**
+ * Vote represents an encrypted vote using the EC-ElGamal encryption scheme.
+ *
+ * @param encryptedMessage The encrypted vote encapsulated in a RerandomizableEncryptedMessage.
+ */
 data class Vote(
-    private val cipherText: BigInteger,
-    private val gr: BigInteger,
-    private val modulus: BigInteger // TODO: added by Guy, ensure correct arithmetic calculation
+    private val encryptedMessage: RerandomizableEncryptedMessage
 ) {
-    fun getCipherText(): BigInteger = cipherText
+    /**
+     * Retrieves the encrypted message.
+     *
+     * @return The RerandomizableEncryptedMessage representing the ciphertext.
+     */
+    fun getEncryptedMessage(): RerandomizableEncryptedMessage = encryptedMessage
 
-    fun getGR(): BigInteger = gr
+    /**
+     * Rerandomizes the ciphertext by adding additional randomness.
+     *
+     * @param publicKey The ElGamal public key used for rerandomization.
+     * @param domainParameters The EC domain parameters.
+     * @return A new Vote instance with rerandomized ciphertext.
+     */
+    fun addRandomness(publicKey: ECPublicKey, domainParameters: ECDomainParameters): Vote {
+        // Deserialize the current ciphertext
+        val elGamalCiphertext = ElGamal.deserializeCiphertext(encryptedMessage)
 
-    fun addRandomness(randomness: BigInteger): Vote {
-        // Note: add randomness return a new object, and doesn't change the original one
-        val newCipherText = cipherText.multiply(randomness).mod(modulus)
-        val newGR = gr.multiply(randomness).mod(modulus)
-        return copy(cipherText = newCipherText, gr = newGR)
+        // Rerandomize the ciphertext using EC-ElGamal rerandomization
+        val rerandomizedCiphertext = ElGamal.rerandomizeCiphertext(elGamalCiphertext, publicKey, domainParameters)
+
+        // Serialize the rerandomized ciphertext back to RerandomizableEncryptedMessage
+        val rerandomizedMessage = ElGamal.serializeCiphertext(rerandomizedCiphertext)
+
+        // Return a new Vote instance with the rerandomized ciphertext
+        return copy(encryptedMessage = rerandomizedMessage)
     }
 
 }
