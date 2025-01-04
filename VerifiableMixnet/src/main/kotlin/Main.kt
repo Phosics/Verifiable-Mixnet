@@ -16,41 +16,66 @@ import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import org.example.crypto.KeySerialization
 import java.security.Security
+import java.util.Scanner
 
 /**
- * Main demonstrates the usage of EC-ElGamal encryption and decryption.
+ * Main demonstrates the usage of EC-ElGamal encryption, rerandomization, and decryption.
  */
 fun main() {
-    // Add Bouncy Castle as a Security Provider
-    Security.addProvider(BouncyCastleProvider())
+    try {
+        // Add Bouncy Castle as a Security Provider
+        Security.addProvider(BouncyCastleProvider())
 
-    // Initialize cryptographic configuration
-    val keyPair = CryptoConfig.generateKeyPair()
-    val publicKey = CryptoConfig.getPublicKey(keyPair)
-    val privateKey = CryptoConfig.getPrivateKey(keyPair)
-    val domainParameters: ECDomainParameters = CryptoConfig.ecDomainParameters
+        // Initialize cryptographic configuration
+        val keyPair = CryptoConfig.generateKeyPair()
+        val publicKey = CryptoConfig.getPublicKey(keyPair)
+        val privateKey = CryptoConfig.getPrivateKey(keyPair)
+        val domainParameters: ECDomainParameters = CryptoConfig.ecDomainParameters
 
-    // Serialize the public key into ElGamalPublicKey Protobuf message
-    val elGamalPublicKey = KeySerialization.createElGamalPublicKey(publicKey)
-    println("ElGamal Public Key (DER): ${elGamalPublicKey.subjectPublicKeyInfo.toHex()}")
+        // Serialize the public key into ElGamalPublicKey Protobuf message
+        val elGamalPublicKey = KeySerialization.createElGamalPublicKey(publicKey)
+        println("ElGamal Public Key (DER): ${elGamalPublicKey.subjectPublicKeyInfo.toHex()}")
 
-    // Create a sample message ECPoint, e.g., the generator point
-    val messagePoint: ECPoint = domainParameters.g
-    println("Original Message Point: $messagePoint")
+        // Prompt user for input message
+        val scanner = Scanner(System.`in`)
+        print("Enter the message to encrypt: ")
+        val userInput = scanner.nextLine()
 
-    // Encrypt the message
-    val encryptedMessage: RerandomizableEncryptedMessage = ElGamal.encrypt(publicKey, messagePoint, domainParameters)
-    println("Encrypted Message: ${encryptedMessage.data.toHex()}")
+        // Encrypt the message
+        val encryptedMessage: RerandomizableEncryptedMessage = ElGamal.encrypt(publicKey, userInput, domainParameters)
+        println("Encrypted Message: ${encryptedMessage.data.toHex()}")
 
-    // Decrypt the message
-    val decryptedPoint: ECPoint = ElGamal.decrypt(privateKey, encryptedMessage, domainParameters)
-    println("Decrypted Message Point: $decryptedPoint")
+        // Rerandomize the ciphertext twice
+        val firstRerandomizedCiphertext = ElGamal.rerandomizeCiphertext(
+            ElGamal.deserializeCiphertext(encryptedMessage),
+            publicKey,
+            domainParameters
+        )
+        val firstRerandomizedMessage = ElGamal.serializeCiphertext(firstRerandomizedCiphertext)
+        println("First Rerandomized Encrypted Message: ${firstRerandomizedMessage.data.toHex()}")
 
-    // Verify that the decrypted point matches the original message point
-    if (messagePoint.equals(decryptedPoint)) {
-        println("Success: Decrypted point matches the original message point.")
-    } else {
-        println("Error: Decrypted point does not match the original message point.")
+        val secondRerandomizedCiphertext = ElGamal.rerandomizeCiphertext(
+            ElGamal.deserializeCiphertext(firstRerandomizedMessage),
+            publicKey,
+            domainParameters
+        )
+        val secondRerandomizedMessage = ElGamal.serializeCiphertext(secondRerandomizedCiphertext)
+        println("Second Rerandomized Encrypted Message: ${secondRerandomizedMessage.data.toHex()}")
+
+        // Decrypt the final ciphertext
+        val decryptedMessage: String = ElGamal.decrypt(privateKey, secondRerandomizedMessage, domainParameters)
+        println("Decrypted Message: $decryptedMessage")
+
+        // Verify that the decrypted message matches the original message
+        if (userInput == decryptedMessage) {
+            println("Success: Decrypted message matches the original message.")
+        } else {
+            println("Error: Decrypted message does not match the original message.")
+        }
+    } catch (e: IllegalArgumentException) {
+        println("Encryption/Decryption Error: ${e.message}")
+    } catch (e: Exception) {
+        println("An unexpected error occurred: ${e.message}")
     }
 }
 
@@ -60,7 +85,6 @@ fun main() {
 fun ByteString.toHex(): String {
     return org.bouncycastle.util.encoders.Hex.toHexString(this.toByteArray())
 }
-
 
 fun main_for_mixing() {
     val t = 1 // Number of adversaries
