@@ -11,61 +11,68 @@ import java.nio.charset.StandardCharsets
 object MessageUtils {
 
     /**
-     * Converts a string message to an ECPoint by embedding the message bytes into the x-coordinate.
-     * Uses fixed-length encoding with padding to ensure reversibility.
+     * Converts a string message to an ECPoint by embedding the message bytes and a counter into the x-coordinate.
+     * This ensures a deterministic and reversible mapping.
      *
      * @param message The message string to convert.
      * @param domainParameters The EC domain parameters.
      * @return The corresponding ECPoint.
-     * @throws IllegalArgumentException If a valid point cannot be found.
+     * @throws IllegalArgumentException If a valid point cannot be found within the maximum attempts.
      */
     fun encodeMessageToECPoint(message: String, domainParameters: ECDomainParameters): ECPoint {
-        val messageBytes = message.toByteArray(StandardCharsets.UTF_8)
         val curve = domainParameters.curve
         val fieldSize = curve.fieldSize
         val byteLength = (fieldSize + 7) / 8
+        val maxAttempts = 255 // Using 1 byte for the counter
 
-        // Define maximum message length based on field size
-        if (messageBytes.size > byteLength) {
+        // Convert message to bytes
+        val messageBytes = message.toByteArray(StandardCharsets.UTF_8)
+        if (messageBytes.size > byteLength - 1) {
             throw IllegalArgumentException("Message too long to encode as ECPoint.")
         }
 
-        // Pad the message with trailing zeros to reach fixed length
-        val paddedMessage = messageBytes + ByteArray(byteLength - messageBytes.size) { 0x00 }
+        for (counter in 0..maxAttempts) {
+            // Prepend the counter byte to the message bytes
+            val counterByte = counter.toByte()
+            val paddedMessage = messageBytes + ByteArray(byteLength - 1 - messageBytes.size) { 0x00 }
 
-        // Convert padded message to BigInteger
-        val x = BigInteger(1, paddedMessage)
+            // Combine counter and padded message
+            val combinedBytes = byteArrayOf(counterByte) + paddedMessage
 
-        // Prepare x-coordinate bytes
-        var xBytes = x.toByteArray()
-        xBytes = when {
-            xBytes.size < byteLength -> ByteArray(byteLength - xBytes.size) { 0x00.toByte() } + xBytes
-            xBytes.size > byteLength -> xBytes.takeLast(byteLength).toByteArray()
-            else -> xBytes
-        }
+            // Convert to BigInteger
+            val x = BigInteger(1, combinedBytes)
 
-        // Attempt to decode ECPoint with both y-coordinate parities
-        val prefixes = listOf(0x02.toByte(), 0x03.toByte()) // 0x02 for even y, 0x03 for odd y
-
-        for (prefix in prefixes) {
-            try {
-                val encodedPoint = byteArrayOf(prefix) + xBytes
-                val point = curve.decodePoint(encodedPoint)
-                if (point.isValid) {
-                    return point
-                }
-            } catch (e: Exception) {
-                // Invalid point, try next prefix
+            // Prepare x-coordinate bytes
+            var xBytes = x.toByteArray()
+            xBytes = when {
+                xBytes.size < byteLength -> ByteArray(byteLength - xBytes.size) { 0x00.toByte() } + xBytes
+                xBytes.size > byteLength -> xBytes.takeLast(byteLength).toByteArray()
+                else -> xBytes
             }
+
+            // Attempt to decode ECPoint with both y-coordinate parities
+            val prefixes = listOf(0x02.toByte(), 0x03.toByte()) // 0x02 for even y, 0x03 for odd y
+
+            for (prefix in prefixes) {
+                try {
+                    val encodedPoint = byteArrayOf(prefix) + xBytes
+                    val point = curve.decodePoint(encodedPoint)
+                    if (point.isValid) {
+                        return point
+                    }
+                } catch (e: Exception) {
+                    // Invalid point, try next prefix
+                }
+            }
+
+            // If no valid point found, continue to next counter
         }
 
-        // If no valid point is found, throw exception
-        throw IllegalArgumentException("Failed to map message to ECPoint.")
+        throw IllegalArgumentException("Failed to map message to ECPoint within $maxAttempts attempts.")
     }
 
     /**
-     * Converts an ECPoint back to a string message by extracting the x-coordinate.
-     * Removes any padding bytes that were added during encoding.
+     * Converts an ECPoint back to a string message by extracting the x-coordinate and removing the counter and padding.
      *
      * @param point The ECPoint to convert.
      * @return The corresponding string message.
@@ -86,9 +93,15 @@ object MessageUtils {
             else -> xBytes
         }
 
-        // Remove trailing zeros (padding)
-        xBytes = xBytes.dropLastWhile { it == 0x00.toByte() }.toByteArray()
+        // Extract the counter byte
+        val counter = xBytes[0].toInt()
 
-        return String(xBytes, StandardCharsets.UTF_8)
+        // Extract the message bytes
+        val messageBytes = xBytes.sliceArray(1 until byteLength)
+
+        // Remove padding bytes (trailing zeros)
+        val strippedMessageBytes = messageBytes.dropLastWhile { it == 0x00.toByte() }.toByteArray()
+
+        return String(strippedMessageBytes, StandardCharsets.UTF_8)
     }
 }
