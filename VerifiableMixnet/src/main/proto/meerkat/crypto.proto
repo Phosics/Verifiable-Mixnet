@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package meerkat;
+
+option java_package = "meerkat.protobuf";
+
+enum SignatureType {
+    ECDSA = 0;
+    DSA = 1;
+    RSA = 2;
+}
+
+message BigInteger {
+    bytes data = 1;
+}
+
+// A digital signature
+message Signature {
+    SignatureType type = 1;
+
+    // Data encoding depends on type; default is DER-encoded
+    bytes data = 2;
+
+    // ID of the signer (should be the fingerprint of the signature verification key)
+    bytes signer_id = 3;
+}
+
+// Public key used to verify signatures
+message SignatureVerificationKey {
+    SignatureType type = 1;
+
+    // Data encoding depends on type; default is x509 DER-encoded
+    bytes data = 2;
+}
+
+// A public encryption key
+message EncryptionPublicKey {
+    bytes data = 1;
+}
+
+// Randomness used for encryption
+message EncryptionRandomness {
+    bytes data = 1;
+}
+
+// A proof that randomness is correctly generated
+message RandomnessGenerationProof {
+    bytes data = 1;
+}
+
+// An encrypted message (rerandomizable)
+message RerandomizableEncryptedMessage {
+    bytes data = 1;
+}
+

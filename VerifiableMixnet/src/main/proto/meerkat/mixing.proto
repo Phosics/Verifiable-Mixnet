@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package meerkat;
+
+option java_package = "meerkat.protobuf";
+
+import 'meerkat/crypto.proto';
+import 'meerkat/concrete_crypto.proto';
+
+message MixBatchHeader {
+    int32 logN = 1;     // log (base 2) of number of inputs to mix
+    int32 layers = 2;   // Number of layers in mix
+}
+
+message Plaintext {
+    bytes data = 1;
+}
+
+message Mix2Proof {
+    // Proof that log_g(a) = log_h(b) = x
+    message DlogProof {
+        message FirstMessage {
+            GroupElement gr = 1; // g^r
+            GroupElement hr = 2; // h^r
+        }
+        message FinalMessage {
+            BigInteger xcr = 1; // xc+r, where c is the challenge
+        }
+    }
+
+    message AndProof {
+        message FirstMessage {
+            DlogProof.FirstMessage clause0 = 1;
+            DlogProof.FirstMessage clause1 = 2;
+        }
+        message FinalMessage {
+            DlogProof.FinalMessage clause0 = 1;
+            DlogProof.FinalMessage clause1 = 2;
+        }
+    }
+
+    message FirstMessage {
+        AndProof.FirstMessage clause0 = 1;
+        AndProof.FirstMessage clause1 = 2;
+    }
+    message FinalMessage {
+        AndProof.FinalMessage clause0 = 1;
+        AndProof.FinalMessage clause1 = 2;
+        BigInteger c0 = 3; // Challenge for clause 0; challenge for clause 1 is computed from real challenge and c0
+    }
+
+
+    // Location of the
+    message Location {
+        int32 layer = 1;        // layer in which the switch is placed
+        int32 switchIdx = 2;    // idx of the switch
+        int32 out0 = 3;         // idx of the first output ciphertext (in layer+1 of the ciphertext matrix)
+        int32 out1 = 4;         // idx of the second output ciphertext (in layer+1 of the ciphertext matrix)
+    }
+
+
+    FirstMessage firstMessage = 1;
+    FinalMessage finalMessage = 2;
+    Location location = 5;
+}
+
+

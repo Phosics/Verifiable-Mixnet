@@ -1,0 +1,26 @@
+// Protobufs for specific crypto primitives
+
+syntax = "proto3";
+
+package meerkat;
+
+import 'meerkat/crypto.proto';
+
+option java_package = "meerkat.protobuf";
+
+
+message ElGamalPublicKey {
+    // DER-encoded SubjectPublicKeyInfo as in RFC 3279
+    bytes subject_public_key_info = 1;
+}
+
+// Each group element should be an ASN.1 encoded curve point with compression.
+message GroupElement {
+    bytes data = 1;
+}
+
+// An El-Gamal ciphertext
+message ElGamalCiphertext {
+    GroupElement c1 = 1; // First group element
+    GroupElement c2 = 2; // Second group element
+}
