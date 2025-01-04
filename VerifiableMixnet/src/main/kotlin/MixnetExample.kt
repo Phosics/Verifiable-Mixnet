@@ -1,19 +1,14 @@
 package org.example
 
-import meerkat.protobuf.ConcreteCrypto
 import mixnet.MixServersManager
 import org.example.mixnet.Vote
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.math.ec.ECPoint
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
-import org.example.crypto.CryptoUtils
 import java.security.KeyPair
 import java.security.PublicKey
 import java.security.Security
-import java.util.*
 
 
 fun main() {
@@ -24,13 +19,14 @@ fun main() {
     val t = 1 // Number of adversaries
     val n = 8 // Number of votes (must be 2t +1 and a power of 2)
 
-    // Initialize MixServersManager
-    val mixServersManager = MixServersManager(t, n)
-
     // Generate EC-ElGamal key pair
     val keyPair: KeyPair = CryptoConfig.generateKeyPair()
     val publicKey: PublicKey = CryptoConfig.getPublicKey(keyPair)
     val domainParameters: ECDomainParameters = CryptoConfig.ecDomainParameters
+
+    // Initialize MixServersManager
+    val mixServersManager = MixServersManager(publicKey, domainParameters, t, n)
+
 
     // Define dummy messages for testing
     val dummyMessages = listOf(

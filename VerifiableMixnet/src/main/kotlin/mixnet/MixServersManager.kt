@@ -1,8 +1,8 @@
 package mixnet
 
+import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.mixnet.Vote
-import org.example.toHex
-import java.util.*
+import java.security.PublicKey
 
 /**
  * Manages multiple MixServer instances to imitate a mixnet.
@@ -10,7 +10,7 @@ import java.util.*
  * @param t The number of adversaries. The total number of servers is 2t + 1.
  * @param n The number of votes to be mixed. Must be a power of 2.
  */
-class MixServersManager(private val t: Int, private val n: Int) {
+class MixServersManager(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters, private val t: Int, private val n: Int) {
     private val numServers = 2 * t + 1
     private val mixServers: List<MixServer>
 
@@ -21,7 +21,7 @@ class MixServersManager(private val t: Int, private val n: Int) {
         // Initialize 2t + 1 MixServer instances
         mixServers = List(numServers) { index ->
 //            println("Initializing MixServer ${index + 1}/$numServers with n=$n")
-            MixServer(n)
+            MixServer(publicKey, domainParameters, n)
         }
     }
 
@@ -39,7 +39,7 @@ class MixServersManager(private val t: Int, private val n: Int) {
         var currentVotes = votes
         mixServers.forEachIndexed { index, server ->
             server.configureRandomly()
-//            println("Applying MixServer ${index + 1}/$numServers")
+            println("Applying MixServer ${index + 1}/$numServers")
             currentVotes = server.apply(currentVotes)
 //            println("After MixServer ${index + 1}/$numServers: ${currentVotes.map { it.getEncryptedMessage().data.toHex() }}")
         }

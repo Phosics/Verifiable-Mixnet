@@ -4,9 +4,6 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import org.example.mixnet.Vote
-import org.example.crypto.CryptoUtils
-import org.example.crypto.CryptoUtils.toHex
-import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import mixnet.MixServersManager
 import java.security.KeyPair
 import java.security.Security
@@ -80,7 +77,7 @@ object MixnetTest {
         }
 
         // Step 5: Initialize MixServersManager and apply mixnet
-        val mixServersManager = MixServersManager(numberOfAdversaries, totalVotes)
+        val mixServersManager = MixServersManager(publicKey, domainParameters, numberOfAdversaries, totalVotes)
 //        mixServersManager.setPublicKey(publicKey)
 
         // Apply the mixnet to shuffle and rerandomize the votes

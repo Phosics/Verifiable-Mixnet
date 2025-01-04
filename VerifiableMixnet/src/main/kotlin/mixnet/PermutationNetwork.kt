@@ -1,10 +1,12 @@
 package mixnet
 
+import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.mixnet.Switch
 import org.example.mixnet.Vote
+import java.security.PublicKey
 
 
-class PermutationNetwork(val n: Int) {
+class PermutationNetwork(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters, val n: Int) {
     private var switch: Switch? = null
     private var firstCol: MutableList<Switch>? = null
     private var lastCol: MutableList<Switch>? = null
@@ -19,7 +21,7 @@ class PermutationNetwork(val n: Int) {
             initializeColumns()
         } else {
             // If n=2, we only have one switch
-            switch = Switch()
+            switch = Switch(publicKey, domainParameters)
         }
     }
 
@@ -27,16 +29,16 @@ class PermutationNetwork(val n: Int) {
      * Initializes the top and bottom sub-networks.
      */
     private fun initializeSubNetworks() {
-        top = PermutationNetwork(n / 2)
-        bottom = PermutationNetwork(n / 2)
+        top = PermutationNetwork(publicKey, domainParameters, n / 2)
+        bottom = PermutationNetwork(publicKey, domainParameters, n / 2)
     }
 
     /**
      * Initializes the first and last column switches.
      */
     private fun initializeColumns() {
-        firstCol = MutableList(n / 2) { Switch() }
-        lastCol = MutableList(n / 2) { Switch() }
+        firstCol = MutableList(n / 2) { Switch(publicKey, domainParameters) }
+        lastCol = MutableList(n / 2) { Switch(publicKey, domainParameters) }
     }
 
     /**

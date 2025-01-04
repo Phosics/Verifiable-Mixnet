@@ -1,9 +1,9 @@
 package org.example.mixnet
 
-import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.example.crypto.ElGamal
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
+import java.security.PublicKey
 
 /**
  * Vote represents an encrypted vote using the EC-ElGamal encryption scheme.
@@ -27,7 +27,7 @@ data class Vote(
      * @param domainParameters The EC domain parameters.
      * @return A new Vote instance with rerandomized ciphertext.
      */
-    fun addRandomness(publicKey: ECPublicKey, domainParameters: ECDomainParameters): Vote {
+    fun addRandomness(publicKey: PublicKey, domainParameters: ECDomainParameters): Vote {
         // Deserialize the current ciphertext
         val elGamalCiphertext = ElGamal.deserializeCiphertext(encryptedMessage)
 

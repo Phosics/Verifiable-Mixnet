@@ -1,10 +1,11 @@
 package mixnet
 
-import org.example.mixnet.Switch
+import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.mixnet.Vote
+import java.security.PublicKey
 import java.util.*
 
-class MixServer(private val n: Int) {
+class MixServer(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters, private val n: Int) {
     /**
      * Creation:
      * Inputs:
@@ -13,7 +14,7 @@ class MixServer(private val n: Int) {
      * 3.   Create a random permutation of the n votes
      * 4.   Run the algorithm of the shuffle to fix the switches
      */
-    private val permutationNetwork = PermutationNetwork(n)
+    private val permutationNetwork = PermutationNetwork(publicKey, domainParameters, n)
     private val random = Random()
 
 
