@@ -22,7 +22,24 @@ import java.math.BigInteger
  */
 object ElGamal {
 
-    private val secureRandom = SecureRandom()
+    private val secureRandom = createSecureRandom()
+
+    /**
+     * Creates a robust instance of SecureRandom with sufficient entropy.
+     *
+     * @return A SecureRandom instance.
+     */
+    private fun createSecureRandom(): SecureRandom {
+        return try {
+            val secureRandom = SecureRandom.getInstanceStrong()
+            val seed = ByteArray(32)
+            SecureRandom().nextBytes(seed)
+            secureRandom.setSeed(seed)
+            secureRandom
+        } catch (e: Exception) {
+            throw IllegalStateException("SecureRandom initialization failed", e)
+        }
+    }
 
     /**
      * Encrypts a message string using the provided ElGamal public key.
@@ -43,6 +60,9 @@ object ElGamal {
 
         // Convert message string to ECPoint using optimized encoding
         val messagePoint: ECPoint = MessageUtils.encodeMessageToECPoint(message, domainParameters)
+
+        // Validate the message point is on the curve
+        validatePoint(messagePoint, domainParameters)
 
         // Extract Q from publicKey
         val keyFactory = KeyFactory.getInstance("EC", "BC")
@@ -93,6 +113,10 @@ object ElGamal {
         val c1: ECPoint = CryptoUtils.deserializeGroupElement(elGamalCiphertext.c1, domainParameters)
         val c2: ECPoint = CryptoUtils.deserializeGroupElement(elGamalCiphertext.c2, domainParameters)
 
+        // Validate points
+        validatePoint(c1, domainParameters)
+        validatePoint(c2, domainParameters)
+
         // Compute M = C2 - d * C1
         val d: BigInteger = (privateKey as ECPrivateKey).d
         val dC1: ECPoint = c1.multiply(d).normalize()
@@ -121,9 +145,16 @@ object ElGamal {
         val pubKey = keyFactory.generatePublic(x509KeySpec) as ECPublicKey
         val qPoint: ECPoint = pubKey.q
 
+        // Validate the public key point is on the curve
+        validatePoint(qPoint, domainParameters)
+
         // Deserialize existing C1 and C2
         val c1: ECPoint = CryptoUtils.deserializeGroupElement(ciphertext.c1, domainParameters)
         val c2: ECPoint = CryptoUtils.deserializeGroupElement(ciphertext.c2, domainParameters)
+
+        // Validate points
+        validatePoint(c1, domainParameters)
+        validatePoint(c2, domainParameters)
 
         // Choose new random k' ∈ [1, n-1]
         val kPrime = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
@@ -164,6 +195,19 @@ object ElGamal {
     fun deserializeCiphertext(encryptedMessage: RerandomizableEncryptedMessage): ElGamalCiphertext {
         return CryptoUtils.unwrapCiphertext(encryptedMessage)
     }
+
+    /**
+     * Validates that the given ECPoint is on the curve defined by the domain parameters.
+     *
+     * @param point The ECPoint to validate.
+     * @param domainParameters The EC domain parameters.
+     * @throws IllegalArgumentException if the point is invalid.
+     */
+    private fun validatePoint(point: ECPoint, domainParameters: ECDomainParameters) {
+        if (!point.isValid) {
+            throw IllegalArgumentException("Invalid ECPoint: Point is not on the curve")
+        }
+    }
 }
 
 /**
@@ -185,4 +229,5 @@ object BigIntegerUtils {
         } while (result < BigInteger.ONE || result >= max)
         return result
     }
+
 }
