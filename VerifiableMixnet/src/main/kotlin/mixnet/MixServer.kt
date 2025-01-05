@@ -1,6 +1,7 @@
 package mixnet
 
 import org.bouncycastle.crypto.params.ECDomainParameters
+import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.example.mixnet.Vote
 import java.security.PublicKey
 import java.util.*
@@ -21,6 +22,14 @@ class MixServer(private val publicKey: PublicKey, private val domainParameters: 
     init {
         require(n > 0 && (n and (n - 1)) == 0) {
             "n must be a power of 2."
+        }
+        validatePublicKey(publicKey)
+    }
+
+    private fun validatePublicKey(key: PublicKey) {
+        require(key is ECPublicKey) { "Invalid public key type" }
+        require(key.parameters.curve.fieldSize >= 256) {
+            "Insufficient key size"
         }
     }
 

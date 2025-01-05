@@ -37,6 +37,10 @@ object ElGamal {
         message: String,
         domainParameters: ECDomainParameters
     ): RerandomizableEncryptedMessage {
+        // Input validation
+        require(message.isNotEmpty()) { "Message cannot be empty" }
+        require(publicKey is ECPublicKey) { "Invalid public key type" }
+
         // Convert message string to ECPoint using optimized encoding
         val messagePoint: ECPoint = MessageUtils.encodeMessageToECPoint(message, domainParameters)
 

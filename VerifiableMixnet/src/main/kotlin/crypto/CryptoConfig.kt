@@ -3,6 +3,8 @@ package org.example.crypto
 import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.ECNamedCurveTable
+import org.bouncycastle.jce.interfaces.ECPrivateKey
+import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import java.math.BigInteger
@@ -19,6 +21,11 @@ object CryptoConfig {
     init {
         Security.addProvider(BouncyCastleProvider())
     }
+
+    // Secure constants
+    private const val MIN_KEY_SIZE = 256
+    private const val MAX_KEY_SIZE = 521  // Maximum secure EC key size
+    private const val DEFAULT_KEY_SIZE = 256
 
     /**
      * The name of the elliptic curve to be used.
@@ -64,9 +71,45 @@ object CryptoConfig {
      */
     fun generateKeyPair(): KeyPair {
         val keyPairGenerator = KeyPairGenerator.getInstance("EC", "BC")
+
+        // Use a strong SecureRandom implementation
+        val secureRandom = SecureRandom.getInstanceStrong()
+
+        // Add entropy to SecureRandom
+        val seed = ByteArray(32)
+        SecureRandom().nextBytes(seed)
+        secureRandom.setSeed(seed)
+
         val ecSpec = ECGenParameterSpec(EC_CURVE_NAME)
-        keyPairGenerator.initialize(ecSpec, SecureRandom())
-        return keyPairGenerator.generateKeyPair()
+        keyPairGenerator.initialize(ecSpec, secureRandom)
+
+        val keyPair = keyPairGenerator.generateKeyPair()
+
+        // Validate generated key
+        validateKeyPair(keyPair)
+
+        return keyPair
+    }
+
+    // Add key validation
+    private fun validateKeyPair(keyPair: KeyPair) {
+        val publicKey = keyPair.public as ECPublicKey
+        val privateKey = keyPair.private as ECPrivateKey
+
+        // Validate key sizes
+        require(privateKey.parameters.curve.fieldSize >= MIN_KEY_SIZE) {
+            "Private key size is below minimum required size"
+        }
+
+        require(privateKey.parameters.curve.fieldSize <= MAX_KEY_SIZE) {
+            "Private key size exceeds maximum allowed size"
+        }
+
+        // Validate private key is in range
+        require(privateKey.d > BigInteger.ONE &&
+                privateKey.d < privateKey.parameters.n) {
+            "Private key out of valid range"
+        }
     }
 
     /**
