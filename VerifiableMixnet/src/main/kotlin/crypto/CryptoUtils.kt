@@ -6,9 +6,12 @@ import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.groupElement
 import meerkat.protobuf.rerandomizableEncryptedMessage
+import org.bouncycastle.asn1.ASN1InputStream
+import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
+import org.bouncycastle.asn1.DEROctetString
 
 /**
  * CryptoUtils provides utility functions for serializing and deserializing
@@ -25,9 +28,14 @@ object CryptoUtils {
     fun serializeGroupElement(ecPoint: ECPoint): GroupElement {
         // Ensure the point is in compressed form
         val compressedBytes = ecPoint.getEncoded(true) // true for compressed
-        return groupElement {
-            data = ByteString.copyFrom(compressedBytes)
-        }
+
+        // ASN.1 encode the compressed EC point as an OCTET STRING
+        val asn1EncodedPoint = DEROctetString(compressedBytes).encoded
+
+        // Build the GroupElement protobuf message with ASN.1-encoded data
+        return GroupElement.newBuilder()
+            .setData(ByteString.copyFrom(asn1EncodedPoint))
+            .build()
     }
 
     /**
@@ -37,10 +45,35 @@ object CryptoUtils {
      * @param domainParameters The EC domain parameters.
      * @return The deserialized ECPoint.
      */
-    fun deserializeGroupElement(groupElement: GroupElement, domainParameters: ECDomainParameters): ECPoint {
+    fun deserializeGroupElement(
+        groupElement: GroupElement,
+        domainParameters: ECDomainParameters
+    ): ECPoint {
         val data = groupElement.data.toByteArray()
-        // Decode the ASN.1-encoded point
-        return domainParameters.curve.decodePoint(data)
+
+        // Parse the ASN.1-encoded data
+        val asn1Object: ASN1Primitive = try {
+            ASN1InputStream(data).use { it.readObject() }
+                ?: throw IllegalArgumentException("Empty ASN.1 data.")
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Failed to parse ASN.1 data: ${e.message}", e)
+        }
+
+        // Ensure the ASN.1 object is a DEROctetString
+        if (asn1Object !is DEROctetString) {
+            throw IllegalArgumentException("Expected DEROctetString, found: ${asn1Object.javaClass.simpleName}")
+        }
+
+        val compressedPointBytes = asn1Object.octets
+
+        // Decode the compressed EC point
+        val ecPoint: ECPoint = try {
+            domainParameters.curve.decodePoint(compressedPointBytes)
+        } catch (e: Exception) {
+            throw IllegalArgumentException("Failed to decode EC point: ${e.message}", e)
+        }
+
+        return ecPoint
     }
 
     /**
@@ -66,30 +99,32 @@ object CryptoUtils {
         return ElGamalCiphertext.parseFrom(encryptedMessage.data.toByteArray())
     }
 
-    /**
-     * Serializes an ElGamalCiphertext into bytes.
-     *
-     * @param ciphertext The ElGamalCiphertext to serialize.
-     * @return The serialized byte array.
-     */
-    fun serializeCiphertext(ciphertext: ElGamalCiphertext): ByteArray {
-        return ciphertext.toByteArray()
-    }
+//TODO: delete?
 
-    /**
-     * Deserializes bytes into an ElGamalCiphertext.
-     *
-     * @param data The byte array to deserialize.
-     * @return The ElGamalCiphertext.
-     */
-    fun deserializeCiphertext(data: ByteArray): ElGamalCiphertext {
-        return ElGamalCiphertext.parseFrom(data)
-    }
-
-    /**
-     * Extension function to convert ByteString to Hex string.
-     */
-    fun ByteString.toHex(): String {
-        return Hex.toHexString(this.toByteArray())
-    }
+//    /**
+//     * Serializes an ElGamalCiphertext into bytes.
+//     *
+//     * @param ciphertext The ElGamalCiphertext to serialize.
+//     * @return The serialized byte array.
+//     */
+//    fun serializeCiphertext(ciphertext: ElGamalCiphertext): ByteArray {
+//        return ciphertext.toByteArray()
+//    }
+//
+//    /**
+//     * Deserializes bytes into an ElGamalCiphertext.
+//     *
+//     * @param data The byte array to deserialize.
+//     * @return The ElGamalCiphertext.
+//     */
+//    fun deserializeCiphertext(data: ByteArray): ElGamalCiphertext {
+//        return ElGamalCiphertext.parseFrom(data)
+//    }
+//
+//    /**
+//     * Extension function to convert ByteString to Hex string.
+//     */
+//    fun ByteString.toHex(): String {
+//        return Hex.toHexString(this.toByteArray())
+//    }
 }

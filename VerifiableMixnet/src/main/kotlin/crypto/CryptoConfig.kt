@@ -134,6 +134,7 @@ object CryptoConfig {
 
     /**
      * Encodes an EC public key into DER-encoded SubjectPublicKeyInfo format as per RFC 3279.
+     * Note that this encoding includes the elliptic-curve group parameters.
      *
      * @param publicKey The EC public key to encode.
      * @return A byte array containing the DER-encoded public key.
