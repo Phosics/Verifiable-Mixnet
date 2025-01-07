@@ -1,12 +1,21 @@
 package mixnet
 
+import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.mixnet.Switch
 import org.example.mixnet.Vote
 import java.security.PublicKey
 
 
-class PermutationNetwork(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters, val n: Int) {
+/**
+ * PermutationNetwork manages a network of switches to perform permutations on votes.
+ * It supports recursive configuration and collects proofs per layer.
+ */
+class PermutationNetwork(
+    private val publicKey: PublicKey,
+    private val domainParameters: ECDomainParameters,
+    val n: Int
+) {
     private var switch: Switch? = null
     private var firstCol: MutableList<Switch>? = null
     private var lastCol: MutableList<Switch>? = null
@@ -42,34 +51,104 @@ class PermutationNetwork(private val publicKey: PublicKey, private val domainPar
     }
 
     /**
-     * Applies the entire permutation network to an immutable list of votes (size must be n).
-     * Returns a new list of votes.
+     * Applies the entire permutation network to a list of votes (size must be n).
+     * Collects ciphertexts and proofs in matrix formats.
+     *
+     * @param votes A list containing exactly n Vote instances.
+     * @return A Triple containing mixed votes, ciphertexts matrix, and proofs matrix.
      */
-    fun apply(votes: List<Vote>): List<Vote> {
-        if(n == 2) {
+    fun apply(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
+        require(votes.size == n) { "apply() requires exactly n=$n votes, but got ${votes.size}" }
+
+        // Initialize the matrices as mutable lists of mutable lists
+        val proofsMatrix: MutableList<MutableList<Mixing.Mix2Proof>> = mutableListOf()
+        val ciphertextsMatrix: MutableList<MutableList<Vote>> = mutableListOf()
+
+        if (n == 2) {
             // Base case: single switch
-            return switch!!.apply(votes)
+            ciphertextsMatrix.add(votes.toMutableList()) // Layer 0: input
+
+            // Apply the switch operation
+            val switchedVotes = switch!!.apply(votes)
+            ciphertextsMatrix.add(switchedVotes.toMutableList()) // Layer 1: output
+
+            // Initialize proofsMatrix with the switch proof
+            proofsMatrix.add(mutableListOf(switch!!.zkp!!))
+
+            return Triple(switchedVotes, ciphertextsMatrix, proofsMatrix)
         }
 
-        // 1. Apply first column
-        val firstColResult = applyCol(votes, firstCol!!)
+        // Step 1: Apply first column
+        ciphertextsMatrix.add(votes.toMutableList()) // Layer 0: input
 
-        // 2. Re-map wires for sub-networks
-        val firstColMapped = applyFirstColMap(firstColResult)
+        // Apply the first column operation
+        val firstColResult: List<Vote> = applyCol(votes, firstCol!!)
 
-        // 3. Recurse on top half and bottom half
-        val topResult = applySubNetworks(firstColMapped)
+        // Retrieve proofs from firstCol and add as a new column
+        val firstColProofs: List<Mixing.Mix2Proof> = firstCol!!.map { it.zkp!! }
 
-        // 4. Combine results from sub-networks
-        val combined = combineResults(topResult)
+        // Initialize proofsMatrix with the first column proofs
+        for (proof in firstColProofs) {
+            proofsMatrix.add(mutableListOf(proof))
+        }
 
-        // 5. Re-map wires after sub-networks
-        val lastMapRes = applyLastColMap(combined)
 
-        // 6. Apply last column
-        val lastColResult = applyCol(lastMapRes, lastCol!!)
+        // Step 2: Re-map wires for sub-networks
+        val firstColMapped: List<Vote> = applyFirstColMap(firstColResult)
 
-        return lastColResult
+        // Step 3: Recurse on top half and bottom half
+        val half = n / 2
+        val (topVotes, topCiphertexts, topProofs) = top!!.apply(firstColMapped.subList(0, half))
+        val (bottomVotes, bottomCiphertexts, bottomProofs) = bottom!!.apply(firstColMapped.subList(half, n))
+
+        // Step 4: Combine results from sub-networks
+        val combinedVotes: List<Vote> = topVotes + bottomVotes
+        val combinedCiphertexts: List<List<Vote>> = topCiphertexts + bottomCiphertexts
+        val combinedProofs: List<List<Mixing.Mix2Proof>> = topProofs + bottomProofs
+
+        // Convert combinedCiphertexts to MutableList<Vote>
+        val mutableCombinedCiphertexts: List<MutableList<Vote>> = combinedCiphertexts.map { it.toMutableList() }
+
+        // Add the concatenated ciphertexts to ciphertextMatrix
+        ciphertextsMatrix.addAll(mutableCombinedCiphertexts)
+
+        // Convert combinedProofs to MutableList<Mixing.Mix2Proof>
+        val mutableCombinedProofs: List<MutableList<Mixing.Mix2Proof>> = combinedProofs.map { it.toMutableList() }
+
+        // Ensure row count consistency before appending
+        if (mutableCombinedProofs.size != proofsMatrix.size) {
+            throw IllegalStateException("Row count mismatch between proofsMatrix and combinedProofs.")
+        }
+
+        // Append proofs as new columns to existing rows in proofsMatrix
+        for (i in mutableCombinedProofs.indices) {
+            proofsMatrix[i].addAll(mutableCombinedProofs[i])
+        }
+
+        // Step 5: Re-map wires after sub-networks
+        val lastMapRes: List<Vote> = applyLastColMap(combinedVotes)
+
+        // Step 6: Apply last column
+        val lastColResult: List<Vote> = applyCol(lastMapRes, lastCol!!)
+
+        // Retrieve proofs from lastCol and append as a new column
+        val lastColProofs: List<Mixing.Mix2Proof> = lastCol!!.map { it.zkp!! }
+
+        // Ensure row count consistency before appending
+        if (lastColProofs.size != proofsMatrix.size) {
+            throw IllegalStateException("Row count mismatch between proofsMatrix and lastColProofs.")
+        }
+
+        // Append proofs to proofsMatrix
+        for (i in lastColProofs.indices) {
+            proofsMatrix[i].add(lastColProofs[i])
+        }
+
+        // Append the lastColResult to ciphertextsMatrix as the final layer
+        val mutableLastColResult: MutableList<Vote> = lastColResult.toMutableList()
+        ciphertextsMatrix.add(mutableLastColResult)
+
+        return Triple(lastColResult, ciphertextsMatrix, proofsMatrix)
     }
 
     /**
@@ -118,29 +197,6 @@ class PermutationNetwork(private val publicKey: PublicKey, private val domainPar
             result[2 * i + 1] = votes[i + half]
         }
         return result.toList()
-    }
-
-    /**
-     * Applies the permutation to the sub-networks and returns their results.
-     */
-    private fun applySubNetworks(firstColMapped: List<Vote>): Pair<List<Vote>, List<Vote>> {
-        val half = n / 2
-        val topInput = firstColMapped.subList(0, half)   // Safe to read: creates a view
-        val bottomInput = firstColMapped.subList(half, n)
-
-        // Because subList returns a view, create new lists for immutability
-        val topResult = top!!.apply(topInput.toList())
-        val bottomResult = bottom!!.apply(bottomInput.toList())
-
-        return Pair(topResult, bottomResult)
-    }
-
-    /**
-     * Combines the results from the top and bottom sub-networks.
-     */
-    private fun combineResults(subResults: Pair<List<Vote>, List<Vote>>): List<Vote> {
-        val (topVotes, bottomVotes) = subResults
-        return topVotes + bottomVotes
     }
 
 
