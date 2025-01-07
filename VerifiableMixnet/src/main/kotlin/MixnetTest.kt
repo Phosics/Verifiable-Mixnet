@@ -12,6 +12,7 @@ import org.example.mixnet.MixBatchOutput
 import java.security.KeyPair
 import java.security.PublicKey
 import java.security.Security
+import kotlin.math.pow
 import kotlin.random.Random
 
 /**
@@ -90,6 +91,7 @@ object MixnetTest {
         // Print MixBatchOutput for each server and validate layer consistency
         mixBatchOutputs.forEachIndexed { index, mixBatchOutput ->
             println("MixBatchOutput for Server ${index + 1}:")
+            println(mixBatchOutput.header)
 //            println(mixBatchOutput)
             validateMixBatchOutput(mixBatchOutput, totalVotes)
             println("--------------------------------------------------")
@@ -205,19 +207,21 @@ object MixnetTest {
         // 1) Validate CiphertextsMatrix by "rows"
         println("=== Validating CiphertextsMatrix by row (summarized) ===")
 
+        if (expectedCount == 2.0.pow(mixBatchOutput.header.logN).toInt()) {
+            println("✅ The number of votes is correct.")
+        } else {
+            println("❌ The number of votes is incorrect.")
+        }
+
         val columnCount = mixBatchOutput.ciphertextsMatrix.size
         val rowCount = if (columnCount == 0) 0 else mixBatchOutput.ciphertextsMatrix[0].size
 
-        var correctCipherRows = 0
+        val correctCipherRows = mixBatchOutput.header.layers + 1
         for (rowIdx in 0 until rowCount) {
             // Gather row elements from each column
             val rowVotes = mutableListOf<Crypto. RerandomizableEncryptedMessage>()
             for (colIdx in 0 until columnCount) {
                 rowVotes.add(mixBatchOutput.ciphertextsMatrix[colIdx][rowIdx])
-            }
-            // Check if this row has the expected number of votes
-            if (rowVotes.size == expectedCount) {
-                correctCipherRows++
             }
         }
 
@@ -237,16 +241,12 @@ object MixnetTest {
         val proofColumnCount = mixBatchOutput.proofsMatrix.size
         val proofRowCount = if (proofColumnCount == 0) 0 else mixBatchOutput.proofsMatrix[0].size
 
-        var correctProofRows = 0
+        val correctProofRows = mixBatchOutput.header.layers
         for (rowIdx in 0 until proofRowCount) {
             // Gather row proofs from each proof column
             val rowProofs = mutableListOf<Mixing.Mix2Proof>()
             for (colIdx in 0 until proofColumnCount) {
                 rowProofs.add(mixBatchOutput.proofsMatrix[colIdx][rowIdx])
-            }
-            // Check if this proofs row has the expected number of proofs
-            if (rowProofs.size == expectedProofsPerRow) {
-                correctProofRows++
             }
         }
 

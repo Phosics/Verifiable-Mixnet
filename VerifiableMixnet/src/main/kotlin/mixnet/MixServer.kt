@@ -94,7 +94,7 @@ class MixServer(
         // 2. Create MixBatchHeader
         val header = Mixing.MixBatchHeader.newBuilder()
             .setLogN((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
-            .setLayers((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
+            .setLayers((2 * (Math.log(n.toDouble()) / Math.log(2.0)) - 1).toInt()) // 2 * (log_2(N)) -1
             .build()
 
         // 3. Populate MixBatchOutput
