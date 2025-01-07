@@ -58,95 +58,92 @@ class PermutationNetwork(
      * @return A Triple containing mixed votes, ciphertexts matrix, and proofs matrix.
      */
     fun apply(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
-        require(votes.size == n) { "apply() requires exactly n=$n votes, but got ${votes.size}" }
+        validateVotesSize(votes)
 
-        // Initialize the matrices as mutable lists of mutable lists
-        val proofsMatrix: MutableList<MutableList<Mixing.Mix2Proof>> = mutableListOf()
-        val ciphertextsMatrix: MutableList<MutableList<Vote>> = mutableListOf()
-
-        if (n == 2) {
-            // Base case: single switch
-            ciphertextsMatrix.add(votes.toMutableList()) // Layer 0: input
-
-            // Apply the switch operation
-            val switchedVotes = switch!!.apply(votes)
-            ciphertextsMatrix.add(switchedVotes.toMutableList()) // Layer 1: output
-
-            // Initialize proofsMatrix with the switch proof
-            proofsMatrix.add(mutableListOf(switch!!.zkp!!))
-
-            return Triple(switchedVotes, ciphertextsMatrix, proofsMatrix)
+        return if (n == 2) {
+            handleBaseCase(votes)
+        } else {
+            handleRecursiveCase(votes)
         }
+    }
 
-        // Step 1: Apply first column
-        ciphertextsMatrix.add(votes.toMutableList()) // Layer 0: input
+    private fun validateVotesSize(votes: List<Vote>) {
+        require(votes.size == n) { "apply() requires exactly n=$n votes, but got ${votes.size}" }
+    }
+
+    private fun handleBaseCase(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
+        // Initialize the ciphertextsMatrix with two rows, each containing one vote
+        val ciphertextsMatrix = mutableListOf(
+            mutableListOf(votes[0]),
+            mutableListOf(votes[1])
+        )
+
+        // Apply the switch operation
+        val switchedVotes = switch!!.apply(votes) // Should return exactly two votes
+
+        // Append switchedVotes as the second column to ciphertextsMatrix
+        ciphertextsMatrix[0].add(switchedVotes[0])
+        ciphertextsMatrix[1].add(switchedVotes[1])
+
+        // Initialize proofsMatrix with the switch proof for each row
+        val proofsMatrix = mutableListOf(
+            mutableListOf(switch!!.zkp!!)
+        )
+
+        // Return the result for the base case
+        return Triple(switchedVotes, ciphertextsMatrix, proofsMatrix)
+    }
+
+    private fun handleRecursiveCase(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
+        // Initialize the ciphertextsMatrix with n rows, each containing one vote (first column)
+        val ciphertextsMatrix = votes.map { mutableListOf(it) }.toMutableList()
 
         // Apply the first column operation
-        val firstColResult: List<Vote> = applyCol(votes, firstCol!!)
+        val firstColResult: List<Vote> = applyCol(votes, firstCol!!) // Should return exactly 'n' votes
 
-        // Retrieve proofs from firstCol and add as a new column
+        // Retrieve proofs from firstCol and add as the first column in proofsMatrix
         val firstColProofs: List<Mixing.Mix2Proof> = firstCol!!.map { it.zkp!! }
+        val proofsMatrix = firstColProofs.map { mutableListOf(it) }.toMutableList()
 
-        // Initialize proofsMatrix with the first column proofs
-        for (proof in firstColProofs) {
-            proofsMatrix.add(mutableListOf(proof))
-        }
-
-
-        // Step 2: Re-map wires for sub-networks
+        // Re-map wires for sub-networks
         val firstColMapped: List<Vote> = applyFirstColMap(firstColResult)
 
-        // Step 3: Recurse on top half and bottom half
+        // Recurse on top half and bottom half
         val half = n / 2
         val (topVotes, topCiphertexts, topProofs) = top!!.apply(firstColMapped.subList(0, half))
         val (bottomVotes, bottomCiphertexts, bottomProofs) = bottom!!.apply(firstColMapped.subList(half, n))
 
-        // Step 4: Combine results from sub-networks
-        val combinedVotes: List<Vote> = topVotes + bottomVotes
-        val combinedCiphertexts: List<List<Vote>> = topCiphertexts + bottomCiphertexts
-        val combinedProofs: List<List<Mixing.Mix2Proof>> = topProofs + bottomProofs
+        // Combine results from sub-networks
+        val combinedVotes = topVotes + bottomVotes
+        val combinedCiphertexts = topCiphertexts + bottomCiphertexts
+        val combinedProofs = topProofs + bottomProofs
 
-        // Convert combinedCiphertexts to MutableList<Vote>
-        val mutableCombinedCiphertexts: List<MutableList<Vote>> = combinedCiphertexts.map { it.toMutableList() }
-
-        // Add the concatenated ciphertexts to ciphertextMatrix
-        ciphertextsMatrix.addAll(mutableCombinedCiphertexts)
-
-        // Convert combinedProofs to MutableList<Mixing.Mix2Proof>
-        val mutableCombinedProofs: List<MutableList<Mixing.Mix2Proof>> = combinedProofs.map { it.toMutableList() }
-
-        // Ensure row count consistency before appending
-        if (mutableCombinedProofs.size != proofsMatrix.size) {
-            throw IllegalStateException("Row count mismatch between proofsMatrix and combinedProofs.")
+        // Append combinedCiphertexts to ciphertextsMatrix
+        combinedCiphertexts.forEachIndexed { index, ciphertexts ->
+            ciphertextsMatrix[index].addAll(ciphertexts)
         }
 
-        // Append proofs as new columns to existing rows in proofsMatrix
-        for (i in mutableCombinedProofs.indices) {
-            proofsMatrix[i].addAll(mutableCombinedProofs[i])
+        // Append combinedProofs to proofsMatrix
+        combinedProofs.forEachIndexed { index, proofs ->
+            proofsMatrix[index].addAll(proofs)
         }
 
-        // Step 5: Re-map wires after sub-networks
+        // Re-map wires after sub-networks
         val lastMapRes: List<Vote> = applyLastColMap(combinedVotes)
 
-        // Step 6: Apply last column
-        val lastColResult: List<Vote> = applyCol(lastMapRes, lastCol!!)
+        // Apply last column operation
+        val lastColResult: List<Vote> = applyCol(lastMapRes, lastCol!!) // Should return exactly 'n' votes
 
         // Retrieve proofs from lastCol and append as a new column
         val lastColProofs: List<Mixing.Mix2Proof> = lastCol!!.map { it.zkp!! }
-
-        // Ensure row count consistency before appending
-        if (lastColProofs.size != proofsMatrix.size) {
-            throw IllegalStateException("Row count mismatch between proofsMatrix and lastColProofs.")
+        lastColProofs.forEachIndexed { index, proof ->
+            proofsMatrix[index].add(proof)
         }
 
-        // Append proofs to proofsMatrix
-        for (i in lastColProofs.indices) {
-            proofsMatrix[i].add(lastColProofs[i])
+        // Append the lastColResult to ciphertextsMatrix as the final column
+        lastColResult.forEachIndexed { index, vote ->
+            ciphertextsMatrix[index].add(vote)
         }
-
-        // Append the lastColResult to ciphertextsMatrix as the final layer
-        val mutableLastColResult: MutableList<Vote> = lastColResult.toMutableList()
-        ciphertextsMatrix.add(mutableLastColResult)
 
         return Triple(lastColResult, ciphertextsMatrix, proofsMatrix)
     }

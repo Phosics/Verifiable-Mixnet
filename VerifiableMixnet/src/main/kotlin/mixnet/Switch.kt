@@ -1,5 +1,6 @@
 package org.example.mixnet
 
+import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
 import java.util.function.Function
 import java.security.PublicKey
@@ -9,9 +10,14 @@ import java.security.PublicKey
  * Also performs rerandomization to ensure unlinkability.
  * Zero-Knowledge Proof (ZKP) implementation is intended but not included here.
  */
-class Switch(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters) : Function<List<Vote>, List<Vote>> {
+class Switch(
+    private val publicKey: PublicKey,
+    private val domainParameters: ECDomainParameters
+) : Function<List<Vote>, List<Vote>> {
 
     private var b = 0
+    var zkp: Mixing.Mix2Proof? = null
+        private set
 
     /**
      * Sets the switching flag.
@@ -26,9 +32,7 @@ class Switch(private val publicKey: PublicKey, private val domainParameters: ECD
      * Retrieves the current value of the switching flag.
      * @return The value of b.
      */
-    fun getB(): Int {
-        return this.b
-    }
+    fun getB(): Int = b
 
     /**
      * Applies the switch to an immutable list of exactly 2 votes.
@@ -44,7 +48,8 @@ class Switch(private val publicKey: PublicKey, private val domainParameters: ECD
         val swapped = if (b == 1) listOf(votes[1], votes[0]) else listOf(votes[0], votes[1])
 
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
-        // Placeholder for ZKP implementation
+        // Generate ZKP to prove correct switching without revealing b
+        this.zkp = generateZKP(swapped)
 
         // Rerandomize each vote to ensure unlinkability
         val rerandomizedVotes = swapped.map { vote ->
@@ -55,4 +60,23 @@ class Switch(private val publicKey: PublicKey, private val domainParameters: ECD
     }
 
     // TODO: Add method to generate zero-knowledge proofs for correctness
+    /**
+     * ZKP generation.
+     *
+     * @return A Mix2Proof instance representing the ZKP.
+     */
+    private fun generateZKP(swappedVotes: List<Vote>): Mixing.Mix2Proof {
+        // TODO: Implement actual ZKP generation logic based on swappedVotes and switch state (b)
+        return Mixing.Mix2Proof.newBuilder()
+            .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
+            .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
+            .setLocation(Mixing.Mix2Proof.Location.newBuilder()
+                .setLayer(0)        // Example value; set appropriately
+                .setSwitchIdx(0)    // Example value; set appropriately
+                .setOut0(0)         // Example value; set appropriately
+                .setOut1(1)         // Example value; set appropriately
+                .build())
+            .build()
+    }
+
 }

@@ -1,12 +1,22 @@
 package mixnet
 
+import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
+import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.Vote
 import java.security.PublicKey
 import java.util.*
 
-class MixServer(private val publicKey: PublicKey, private val domainParameters: ECDomainParameters, private val n: Int) {
+/**
+ * MixServer implements Abe's Permutation-network-based mix.
+ * It serializes the output as per the specified on-disk format.
+ */
+class MixServer(
+    private val publicKey: PublicKey,
+    private val domainParameters: ECDomainParameters,
+    private val n: Int
+) {
     /**
      * Creation:
      * Inputs:
@@ -53,25 +63,48 @@ class MixServer(private val publicKey: PublicKey, private val domainParameters: 
     }
 
     /**
-     * Public method: chooses a random permutation and configures the network accordingly.
+     * Configures the network with a random permutation.
      */
     fun configureRandomly() {
-        var sigma = randomPermutation(n)
-//        sigma = intArrayOf(2,0,3,1)
-        // TODO: delete above
-//        println("Sigma: ${sigma.contentToString()}")
+        val sigma = randomPermutation(n)
         permutationNetwork.configNetBySigma(sigma)
     }
 
     /**
-     * Once configured, apply the mix to the given votes (size = n).
-     * Returns a new list of permuted/re-encrypted votes.
+     * Applies the mix to the given votes.
+     *
+     * @param votes A list of n Vote instances.
+     * @return A Triple containing mixed votes, ciphertexts matrix, and proofs matrix.
      */
-    fun apply(votes: List<Vote>): List<Vote> {
-        require(votes.size == n) {
-            "apply() requires exactly n=$n votes, but got ${votes.size}"
-        }
+    fun apply(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
         return permutationNetwork.apply(votes)
+    }
+
+
+    /**
+     * Processes a mix batch and returns the serialized components as a MixBatchOutput object.
+     *
+     * @param votes The list of votes to be mixed.
+     * @return A MixBatchOutput containing the header, ciphertexts matrix, and proofs matrix.
+     */
+    fun processMixBatch(votes: List<Vote>): MixBatchOutput {
+        // 1. Apply the mix
+        val (mixedVotes, ciphertextsMatrix, proofsMatrix) = apply(votes)
+
+        // 2. Create MixBatchHeader
+        val header = Mixing.MixBatchHeader.newBuilder()
+            .setLogN((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
+            .setLayers((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
+            .build()
+
+        // 3. Populate MixBatchOutput
+        return MixBatchOutput(
+            header = header,
+            ciphertextsMatrix = ciphertextsMatrix.map { layerVotes ->
+                layerVotes.map { it.getEncryptedMessage() }
+            },
+            proofsMatrix = proofsMatrix
+        )
     }
 
 }

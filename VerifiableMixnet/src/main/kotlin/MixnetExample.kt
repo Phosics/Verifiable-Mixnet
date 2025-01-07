@@ -1,15 +1,16 @@
 package org.example
 
+import meerkat.protobuf.Mixing
 import mixnet.MixServersManager
 import org.example.mixnet.Vote
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
+import org.example.mixnet.MixBatchOutput
 import java.security.KeyPair
 import java.security.PublicKey
 import java.security.Security
-
 
 fun main() {
     // Register Bouncy Castle as a security provider
@@ -26,7 +27,6 @@ fun main() {
 
     // Initialize MixServersManager
     val mixServersManager = MixServersManager(publicKey, domainParameters, t, n)
-
 
     // Define dummy messages for testing
     val dummyMessages = listOf(
@@ -49,40 +49,38 @@ fun main() {
         Vote(encryptedMessage)
     }.toMutableList()
 
-//    // Display Initial Votes
-//    println("Initial Votes:")
-//    votes.forEachIndexed { index, vote ->
-//        println("Vote $index:")
-//        println("Encrypted Message: ${vote.getEncryptedMessage().data.toHex()}")
-//        println("--------------------------------------------------")
-//    }
+    // Create MixBatchHeader
+    val header = Mixing.MixBatchHeader.newBuilder()
+        .setLogN(3) // log2(8) = 3
+        .setLayers(3) // Typically equal to logN for a permutation network-based mix
+        .build()
 
-    // Apply the mixing operation
-    val mixedVotes = mixServersManager.apply(votes)
+    // Apply the mixing operation and get MixBatchOutputs from each server
+    val mixBatchOutputs: List<MixBatchOutput> = mixServersManager.processMixBatch(votes)
 
-//    // Display Final Mixed Votes
-//    println("\nFinal Mixed Votes:")
-//    mixedVotes.forEachIndexed { index, vote ->
-//        println("Vote $index:")
-//        println("Encrypted Message: ${vote.getEncryptedMessage().data.toHex()}")
-//        println("--------------------------------------------------")
-//    }
+    // Print MixBatchOutput for each server
+    mixBatchOutputs.forEachIndexed { index, mixBatchOutput ->
+        println("MixBatchOutput for Server ${index + 1}:")
+        println(mixBatchOutput)
+        println("--------------------------------------------------")
+    }
 
     // (Optional) Decrypt the mixed votes to verify correctness
     println("\nDecrypting Mixed Votes for Verification:")
-    mixedVotes.forEachIndexed { index, vote: Vote ->
+    // Assuming mixBatchOutputs contain the final layer ciphertexts
+    val finalLayerCiphertexts = mixBatchOutputs.last().ciphertextsMatrix.map { it.last() }
+    finalLayerCiphertexts.forEachIndexed { index, ciphertext ->
         val decryptedMessage = ElGamal.decrypt(
             CryptoConfig.getPrivateKey(keyPair),
-            vote.getEncryptedMessage(),
+            ciphertext,
             domainParameters
         )
         println("Decrypted Vote $index: $decryptedMessage")
     }
-}
 
-/**
- * Extension function to convert ByteString to hex string.
- */
-fun ByteArray.toHex(): String {
-    return org.bouncycastle.util.encoders.Hex.toHexString(this)
+    mixBatchOutputs.forEachIndexed { index, mixBatchOutput ->
+        println("MixBatchOutput verifier for Server ${index + 1}:")
+        println(mixBatchOutput.verifyMixBatch())
+        println("--------------------------------------------------")
+    }
 }

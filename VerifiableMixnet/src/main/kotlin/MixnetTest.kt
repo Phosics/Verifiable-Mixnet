@@ -1,11 +1,16 @@
 package org.example
 
+import meerkat.protobuf.Crypto
+import meerkat.protobuf.Mixing
+import mixnet.MixServer
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import org.example.mixnet.Vote
 import mixnet.MixServersManager
+import org.example.mixnet.MixBatchOutput
 import java.security.KeyPair
+import java.security.PublicKey
 import java.security.Security
 import kotlin.random.Random
 
@@ -22,7 +27,7 @@ object MixnetTest {
 
         // Step 2: Initialize cryptographic configurations
         val keyPair: KeyPair = CryptoConfig.generateKeyPair()
-        val publicKey = CryptoConfig.getPublicKey(keyPair)
+        val publicKey: PublicKey = CryptoConfig.getPublicKey(keyPair)
         val privateKey = CryptoConfig.getPrivateKey(keyPair)
         val domainParameters = CryptoConfig.ecDomainParameters
 
@@ -78,29 +83,39 @@ object MixnetTest {
 
         // Step 5: Initialize MixServersManager and apply mixnet
         val mixServersManager = MixServersManager(publicKey, domainParameters, numberOfAdversaries, totalVotes)
-//        mixServersManager.setPublicKey(publicKey)
 
         // Apply the mixnet to shuffle and rerandomize the votes
-        val mixedVotes = mixServersManager.apply(encryptedVotes)
+        val mixBatchOutputs: List<MixBatchOutput> = mixServersManager.processMixBatch(encryptedVotes)
 
-//        // Display Final Mixed Votes
-//        println("\nFinal Mixed Votes:")
-//        mixedVotes.forEachIndexed { index, vote: Vote ->
-//            println("Vote $index:")
-//            println("Encrypted Message: ${vote.getEncryptedMessage().data.toHex()}")
-//            println("--------------------------------------------------")
-//        }
+        // Print MixBatchOutput for each server and validate layer consistency
+        mixBatchOutputs.forEachIndexed { index, mixBatchOutput ->
+            println("MixBatchOutput for Server ${index + 1}:")
+//            println(mixBatchOutput)
+            validateMixBatchOutput(mixBatchOutput, totalVotes)
+            println("--------------------------------------------------")
+        }
 
         // Step 6: Decrypt mixed votes
-        val decryptedVotes: List<String> = mixedVotes.map { vote: Vote ->
-            ElGamal.decrypt(privateKey, vote.getEncryptedMessage(), domainParameters)
+        println("\nDecrypting Mixed Votes for Verification:")
+        // Assuming mixBatchOutputs contain the final layer ciphertexts
+        val finalLayerCiphertexts = mixBatchOutputs.last().ciphertextsMatrix.map { it.last() }
+        finalLayerCiphertexts.forEachIndexed { index, ciphertext ->
+            val decryptedMessage = ElGamal.decrypt(
+                CryptoConfig.getPrivateKey(keyPair),
+                ciphertext,
+                domainParameters
+            )
+//            println("Decrypted Vote $index: $decryptedMessage")
         }
 
         // Step 7: Tally decrypted votes
+        val decryptedVotes: List<String> = finalLayerCiphertexts.map { ciphertext ->
+            ElGamal.decrypt(privateKey, ciphertext, domainParameters)
+        }
         val decryptedVoteCounts = tallyVotes(decryptedVotes)
 
         // Display Decrypted Vote Counts After Mixing
-        println("\nDecrypted Vote Counts After Applying ${2*numberOfAdversaries+1} MixServers:")
+        println("\nDecrypted Vote Counts After Applying ${2 * numberOfAdversaries + 1} MixServers:")
         decryptedVoteCounts.forEach { (option, count) ->
             println("$option: $count")
         }
@@ -171,5 +186,97 @@ object MixnetTest {
      */
     private fun isPowerOfTwo(n: Int): Boolean {
         return n > 0 && (n and (n - 1)) == 0
+    }
+
+    /**
+     * Extension function to convert ByteArray to hex string.
+     */
+    fun ByteArray.toHex(): String {
+        return org.bouncycastle.util.encoders.Hex.toHexString(this)
+    }
+
+    /**
+     * Validates that each layer in the CiphertextsMatrix contains the expected number of elements.
+     *
+     * @param mixBatchOutput The MixBatchOutput to validate.
+     * @param expectedCount The expected number of ciphertexts per layer.
+     */
+    fun validateMixBatchOutput(mixBatchOutput: MixBatchOutput, expectedCount: Int): Boolean {
+        // 1) Validate CiphertextsMatrix by "rows"
+        println("=== Validating CiphertextsMatrix by row (summarized) ===")
+
+        val columnCount = mixBatchOutput.ciphertextsMatrix.size
+        val rowCount = if (columnCount == 0) 0 else mixBatchOutput.ciphertextsMatrix[0].size
+
+        var correctCipherRows = 0
+        for (rowIdx in 0 until rowCount) {
+            // Gather row elements from each column
+            val rowVotes = mutableListOf<Crypto. RerandomizableEncryptedMessage>()
+            for (colIdx in 0 until columnCount) {
+                rowVotes.add(mixBatchOutput.ciphertextsMatrix[colIdx][rowIdx])
+            }
+            // Check if this row has the expected number of votes
+            if (rowVotes.size == expectedCount) {
+                correctCipherRows++
+            }
+        }
+
+        // Summarized result of all ciphertext rows
+        if (correctCipherRows == rowCount) {
+            println("✅ All $rowCount ciphertext rows have $expectedCount votes.")
+        } else {
+            println("❌ $correctCipherRows out of $rowCount ciphertext rows have $expectedCount votes.")
+        }
+
+        // 2) Validate ProofsMatrix by "rows"
+        println("\n=== Validating ProofsMatrix by row (summarized) ===")
+
+        // You mentioned each 2x2 switch handles 2 votes => typical check = expectedCount / 2
+        val expectedProofsPerRow = expectedCount / 2
+
+        val proofColumnCount = mixBatchOutput.proofsMatrix.size
+        val proofRowCount = if (proofColumnCount == 0) 0 else mixBatchOutput.proofsMatrix[0].size
+
+        var correctProofRows = 0
+        for (rowIdx in 0 until proofRowCount) {
+            // Gather row proofs from each proof column
+            val rowProofs = mutableListOf<Mixing.Mix2Proof>()
+            for (colIdx in 0 until proofColumnCount) {
+                rowProofs.add(mixBatchOutput.proofsMatrix[colIdx][rowIdx])
+            }
+            // Check if this proofs row has the expected number of proofs
+            if (rowProofs.size == expectedProofsPerRow) {
+                correctProofRows++
+            }
+        }
+
+        // Summarized result of all proof rows
+        if (correctProofRows == proofRowCount) {
+            println("✅ All $proofRowCount proof rows have $expectedProofsPerRow proofs.")
+        } else {
+            println("❌ $correctProofRows out of $proofRowCount proof rows have $expectedProofsPerRow proofs.")
+        }
+
+        // 3) Verify the proofs’ signatures (or correctness) using your existing method
+        println("\n=== Verifying proof signatures ===")
+        val proofsValid = mixBatchOutput.verifyMixBatch()
+        if (proofsValid) {
+            println("✅ All proofs pass signature verification.")
+        } else {
+            println("❌ Some proofs fail verification.")
+        }
+
+        println("\n=== Validation Summary ===")
+        // Final decision: all checks must be correct
+        val allRowsCorrect = (correctCipherRows == rowCount) && (correctProofRows == proofRowCount)
+        val allChecksPassed = allRowsCorrect && proofsValid
+
+        if (allChecksPassed) {
+            println("✅ Overall: All rows correct and all proofs verified successfully.")
+        } else {
+            println("❌ Overall: Some checks or proofs failed.")
+        }
+
+        return allChecksPassed
     }
 }
