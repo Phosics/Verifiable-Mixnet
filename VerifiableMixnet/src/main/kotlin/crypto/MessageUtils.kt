@@ -20,6 +20,9 @@ object MessageUtils {
      * @throws IllegalArgumentException If a valid point cannot be found within the maximum attempts.
      */
     fun encodeMessageToECPoint(message: String, domainParameters: ECDomainParameters): ECPoint {
+
+        // TODO: is there a buildint BC function to donvert string to point
+
         val curve = domainParameters.curve
         val fieldSize = curve.fieldSize
         val byteLength = (fieldSize + 7) / 8

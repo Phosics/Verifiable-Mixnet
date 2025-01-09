@@ -47,14 +47,14 @@ class Switch(
         // Perform the switching operation based on the flag b
         val swapped = if (b == 1) listOf(votes[1], votes[0]) else listOf(votes[0], votes[1])
 
-        // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
-        // Generate ZKP to prove correct switching without revealing b
-        this.zkp = generateZKP(swapped)
-
         // Rerandomize each vote to ensure unlinkability
         val rerandomizedVotes = swapped.map { vote ->
             vote.addRandomness(publicKey, domainParameters)
         }
+
+        // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
+        // Generate ZKP to prove correct switching without revealing b
+        this.zkp = generateZKP(swapped)
 
         return rerandomizedVotes
     }

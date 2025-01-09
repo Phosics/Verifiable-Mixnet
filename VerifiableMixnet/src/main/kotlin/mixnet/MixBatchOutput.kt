@@ -12,6 +12,7 @@ data class MixBatchOutput(
     val header: Mixing.MixBatchHeader,
     val ciphertextsMatrix: List<List<Crypto.RerandomizableEncryptedMessage>>,
     val proofsMatrix: List<List<Mixing.Mix2Proof>>,
+
     val defaultProof:  Mixing.Mix2Proof = Mixing.Mix2Proof.newBuilder()
         .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
         .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
@@ -79,6 +80,8 @@ data class MixBatchOutput(
      * @return True if all proofs are valid, False otherwise.
      */
     fun verifyMixBatch(): Boolean {
+        // TODO: It is not a proper location for this function
+
         // Iterate through each layer's proofs
         for (layerProofs in proofsMatrix) {
             for (proof in layerProofs) {
