@@ -12,6 +12,8 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import org.bouncycastle.asn1.DEROctetString
+import java.math.BigInteger
+import java.security.MessageDigest
 
 /**
  * CryptoUtils provides utility functions for serializing and deserializing
@@ -98,6 +100,31 @@ object CryptoUtils {
     fun unwrapCiphertext(encryptedMessage: RerandomizableEncryptedMessage): ElGamalCiphertext {
         return ElGamalCiphertext.parseFrom(encryptedMessage.data.toByteArray())
     }
+
+    /**
+     * Deserializes a GroupElement protobuf message into an ECPoint.
+     */
+    fun deserializeGroupElementBytes(groupElement: GroupElement, domainParameters: ECDomainParameters): ECPoint {
+        return domainParameters.curve.decodePoint(groupElement.toByteArray())
+    }
+
+    /**
+     * Serializes an ECPoint into a byte array.
+     */
+    fun serializeECPointBytes(point: ECPoint): ByteArray {
+        return point.getEncoded(false) // Use getEncoded() instead of 'encoded'
+    }
+
+    /**
+     * Hashes the input byte array using SHA-256 and converts to BigInteger.
+     */
+    fun hashToBigInteger(input: ByteArray): BigInteger {
+        val md = MessageDigest.getInstance("SHA-256")
+        md.reset()
+        val digest = md.digest(input)
+        return BigInteger(1, digest)
+    }
+
 
 //TODO: delete?
 
