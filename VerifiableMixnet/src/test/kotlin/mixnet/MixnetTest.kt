@@ -1,13 +1,11 @@
-package org.example
+package mixnet
 
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
-import mixnet.MixServer
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import org.example.mixnet.Vote
-import mixnet.MixServersManager
 import org.example.mixnet.MixBatchOutput
 import java.security.KeyPair
 import java.security.PublicKey

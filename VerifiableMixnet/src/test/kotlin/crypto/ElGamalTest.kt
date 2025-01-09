@@ -1,17 +1,13 @@
-package org.example
+package crypto
 
-import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.math.ec.ECPoint
-import com.google.protobuf.ByteString
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import java.security.KeyPair
 import java.security.Security
 import java.security.SecureRandom
-import java.util.*
 
 /**
  * ElGamalTest performs comprehensive testing of the EC-ElGamal encryption, rerandomization, and decryption processes.
