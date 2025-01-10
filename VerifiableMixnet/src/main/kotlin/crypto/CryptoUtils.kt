@@ -86,9 +86,9 @@ object CryptoUtils {
      */
     fun wrapCiphertext(ciphertext: ElGamalCiphertext): RerandomizableEncryptedMessage {
         val serializedCiphertext = ciphertext.toByteArray()
-        return rerandomizableEncryptedMessage {
-            data = ByteString.copyFrom(serializedCiphertext)
-        }
+        return RerandomizableEncryptedMessage.newBuilder()
+            .setData(ByteString.copyFrom(serializedCiphertext))
+            .build()
     }
 
     /**
@@ -105,7 +105,7 @@ object CryptoUtils {
      * Deserializes a GroupElement protobuf message into an ECPoint.
      */
     fun deserializeGroupElementBytes(groupElement: GroupElement, domainParameters: ECDomainParameters): ECPoint {
-        return domainParameters.curve.decodePoint(groupElement.toByteArray())
+        return domainParameters.curve.decodePoint(groupElement.data.toByteArray())
     }
 
     /**
