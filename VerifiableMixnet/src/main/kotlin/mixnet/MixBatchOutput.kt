@@ -3,6 +3,7 @@ package org.example.mixnet
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
 import org.bouncycastle.util.encoders.Hex.toHexString
+import java.io.OutputStream
 
 /**
  * Encapsulates the serialized output of a mix batch.
@@ -111,6 +112,28 @@ data class MixBatchOutput(
      */
     fun ByteArray.toHex(): String {
         return org.bouncycastle.util.encoders.Hex.toHexString(this)
+    }
+
+    /**
+     * Serializes the MixBatchOutput to the given OutputStream using writeDelimitedTo().
+     */
+    fun serialize(outputStream: OutputStream) {
+        // Write MixBatchHeader
+        MixerUtils.writeMixBatchHeader(header, outputStream)
+
+        // Write Ciphertexts Matrix column by column
+        ciphertextsMatrix.forEach { column ->
+            column.forEach { ciphertext ->
+                MixerUtils.writeCiphertexts(listOf(ciphertext), outputStream)
+            }
+        }
+
+        // Write Proofs Matrix column by column
+        proofsMatrix.forEach { column ->
+            column.forEach { proof ->
+                MixerUtils.writeProofs(listOf(proof), outputStream)
+            }
+        }
     }
 
 }
