@@ -134,7 +134,8 @@ object ElGamal {
     fun rerandomizeCiphertext(
         ciphertext: ElGamalCiphertext,
         publicKey: PublicKey,
-        domainParameters: ECDomainParameters
+        domainParameters: ECDomainParameters,
+        r: BigInteger = BigInteger.ZERO
     ): ElGamalCiphertext {
         // Extract Q from publicKey
         val keyFactory = KeyFactory.getInstance("EC", "BC")
@@ -154,7 +155,8 @@ object ElGamal {
         validatePoint(c2, domainParameters)
 
         // Choose new random k' ∈ [1, n-1]
-        val kPrime = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        var kPrime = r
+        if (r == BigInteger.ZERO) {kPrime = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)}
 
         // Compute new C1' = C1 + k' * G
         val newC1: ECPoint = c1.add(domainParameters.g.multiply(kPrime)).normalize()

@@ -7,6 +7,7 @@ import org.example.crypto.BigIntegerUtils
 import org.example.crypto.CryptoConfig
 import org.example.crypto.CryptoUtils
 import java.math.BigInteger
+import java.nio.ByteBuffer
 import java.util.function.Function
 import java.security.PublicKey
 import java.security.SecureRandom
@@ -53,9 +54,15 @@ class Switch(
         // Perform the switching operation based on the flag b
         val swapped = if (b == 1) listOf(votes[1], votes[0]) else listOf(votes[0], votes[1])
 
-        // Rerandomize each vote to ensure unlinkability
-        val rerandomizedVotes = swapped.map { vote ->
-            vote.addRandomness(publicKey, domainParameters)
+        // Generate two separate random nonces for each swapped output
+        val secureRandom = SecureRandom.getInstanceStrong()
+        val r1 = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        val r2 = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+
+        // Rerandomize the votes with the generated randoms
+        val rerandomizedVotes = swapped.mapIndexed { index, vote ->
+            val r = if (index == 0) r1 else r2
+            vote.addRandomness(publicKey, domainParameters, r)
         }
 
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
@@ -80,9 +87,9 @@ class Switch(
         val cCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[0].getEncryptedMessage())
         val dCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[1].getEncryptedMessage())
 
-        // Generate proofs for each vote pair
-        val proof0 = generateSingleZKP(aCiphertext.c1, aCiphertext.c2, cCiphertext.c1, cCiphertext.c2)
-        val proof1 = generateSingleZKP(bCiphertext.c1, bCiphertext.c2, dCiphertext.c1, dCiphertext.c2)
+//        // Generate proofs for each vote pair
+//        val proof0 = generateSingleZKP(aCiphertext.c1, aCiphertext.c2, cCiphertext.c1, cCiphertext.c2)
+//        val proof1 = generateSingleZKP(bCiphertext.c1, bCiphertext.c2, dCiphertext.c1, dCiphertext.c2)
 
         // Package proofs into Mix2Proof
         return Mixing.Mix2Proof.newBuilder()
@@ -97,47 +104,82 @@ class Switch(
             .build()
     }
 
+    /**
+     * Generates the Schnorr Discrete-Log-Equality Proof.
+     * Proves that log_g(X) = log_h(Y), where:
+     * X = c1 / a1
+     * Y = c2 / a2
+     *
+     * @param a1 The first component of the original ciphertext.
+     * @param a2 The second component of the original ciphertext.
+     * @param c1 The first component of the rerandomized ciphertext.
+     * @param c2 The second component of the rerandomized ciphertext.
+     * @param r The randomness used in rerandomization.
+     * @return An instance of SchnorrProofDL containing A_g, A_h, and z.
+     */
     private fun generateSingleZKP(
         a1: GroupElement,
         a2: GroupElement,
         c1: GroupElement,
-        c2: GroupElement
-    ): Pair<ByteArray, ByteArray> {
+        c2: GroupElement,
+        r: BigInteger
+    ): SchnorrProofDL {
         // Deserialize GroupElements to ECPoints
         val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
-        val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters) // Corrected
-
+        val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
         val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
         val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
 
-        // Compute c1 / a1 and c2 / a2
-        // In elliptic curves, division is equivalent to multiplying by the inverse
-        val c1DivA1 = c1Point.add(a1Point.negate()).normalize()
-        val c2DivA2 = c2Point.add(a2Point.negate()).normalize()
+        // Compute X = c1 - a1 and Y = c2 - a2
+        val X = c1Point.add(a1Point.negate()).normalize()
+        val Y = c2Point.add(a2Point.negate()).normalize()
 
-        val x = publicKey // TODO: convert to point
+        // Deserialize h (public key) into ECPoint
+        val hPoint = CryptoUtils.extractECPointFromPublicKey(publicKey)
 
-        // Generate a random nonce r in [1, n-1]
-        val secureRandom = SecureRandom.getInstanceStrong() // TODO: Change it to a static getter on the mix server
-        val r = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        // Commit Phase: pick random t and compute A_g = g^t, A_h = h^t
+        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
 
-        // Compute u = g^r
-        val u = domainParameters.g.multiply(r).normalize()
+        val A_g = domainParameters.g.multiply(t).normalize()
+        val A_h = hPoint.multiply(t).normalize()
 
-        // Serialize u
-        val uBytes = CryptoUtils.serializeECPointBytes(u)
+        // Serialize A_g and A_h
+        val A_gSerialized = CryptoUtils.serializeGroupElement(A_g)
+        val A_hSerialized = CryptoUtils.serializeGroupElement(A_h)
 
-        // Compute the challenge c using Fiat-Shamir heuristic (hash of u)
-        val c = CryptoUtils.hashToBigInteger(uBytes).mod(domainParameters.n)
+        val A_gBytes = A_gSerialized.data.toByteArray()
+        val A_hBytes = A_hSerialized.data.toByteArray()
 
-        // Compute z = r + c * x mod n
-//        val z = r.add(c.multiply(x)).mod(domainParameters.n)
-        val z = r
+        // Serialize X and Y
+        val XSerialized = CryptoUtils.serializeGroupElement(X)
+        val YSerialized = CryptoUtils.serializeGroupElement(Y)
 
-        // Serialize z
-        val zBytes = z.toByteArray()
+        val XBytes = XSerialized.data.toByteArray()
+        val YBytes = YSerialized.data.toByteArray()
 
-        // Return the proof as (u, z)
-        return Pair(uBytes, zBytes)
+        // Prepare challenge input using Fiat-Shamir heuristic: A_g || A_h || X || Y
+        val challengeInput = ByteBuffer.allocate(
+            A_gBytes.size +
+                    A_hBytes.size +
+                    XBytes.size +
+                    YBytes.size
+        )
+            .put(A_gBytes)
+            .put(A_hBytes)
+            .put(XBytes)
+            .put(YBytes)
+            .array()
+
+        // Compute the challenge c = H(A_g || A_h || X || Y) mod q
+        val c = CryptoUtils.hashToBigInteger(challengeInput).mod(domainParameters.n)
+
+        // Compute the response z = t + c * r mod q
+        val z = t.add(c.multiply(r)).mod(domainParameters.n)
+
+        return SchnorrProofDL(
+            A_g = A_gSerialized,
+            A_h = A_hSerialized,
+            z = z
+        )
     }
 }

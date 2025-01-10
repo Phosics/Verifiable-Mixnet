@@ -12,8 +12,10 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint
 import org.bouncycastle.util.encoders.Hex
 import org.bouncycastle.asn1.DEROctetString
+import org.bouncycastle.jce.interfaces.ECPublicKey
 import java.math.BigInteger
 import java.security.MessageDigest
+import java.security.PublicKey
 
 /**
  * CryptoUtils provides utility functions for serializing and deserializing
@@ -112,7 +114,7 @@ object CryptoUtils {
      * Serializes an ECPoint into a byte array.
      */
     fun serializeECPointBytes(point: ECPoint): ByteArray {
-        return point.getEncoded(false) // Use getEncoded() instead of 'encoded'
+        return point.getEncoded(false)
     }
 
     /**
@@ -123,6 +125,21 @@ object CryptoUtils {
         md.reset()
         val digest = md.digest(input)
         return BigInteger(1, digest)
+    }
+
+    /**
+     * Extracts the ECPoint from a given PublicKey.
+     * Assumes that the PublicKey is an instance of ECPublicKey (from Bouncy Castle).
+     *
+     * @param publicKey The PublicKey to extract the ECPoint from.
+     * @return The corresponding ECPoint.
+     */
+    fun extractECPointFromPublicKey(publicKey: PublicKey): org.bouncycastle.math.ec.ECPoint {
+        if (publicKey is ECPublicKey) {
+            return publicKey.q.normalize()
+        } else {
+            throw IllegalArgumentException("PublicKey is not an instance of ECPublicKey")
+        }
     }
 
 }
