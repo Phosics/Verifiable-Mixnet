@@ -15,7 +15,7 @@ data class SchnorrProofDL(
 /**
  * Encapsulates the Schnorr proofs for both swapped outputs.
  */
-data class ZKPData(
+data class ZKPAndProof(
     val proof1: SchnorrProofDL,
     val proof2: SchnorrProofDL
 )

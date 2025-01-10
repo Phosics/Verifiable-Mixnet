@@ -65,9 +65,14 @@ class Switch(
             vote.addRandomness(publicKey, domainParameters, r)
         }
 
+
+
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
         // Generate ZKP to prove correct switching without revealing b
-        this.zkp = generateZKP(votes, swapped, b)
+//        this.zkp = generateZKP(votes, swapped, b)
+
+        val firstAndProof: ZKPAndProof = generateZKP(votes, swapped, r1, r2)
+        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
 
         return rerandomizedVotes
     }
@@ -75,11 +80,26 @@ class Switch(
     // TODO: Add method to generate zero-knowledge proofs for correctness
 
 
+    /**
+     * Generates Zero-Knowledge Proofs (ZKPs) for rerandomized votes in a mixnet.
+     *
+     * @param votes The original list of votes before rerandomization. Must contain exactly two votes.
+     * @param swappedVotes The list of votes after rerandomization. Must contain exactly two votes.
+     * @param r1 The randomness used for rerandomizing the first vote.
+     * @param r2 The randomness used for rerandomizing the second vote.
+     * @return A [ZKPAndProof] object containing the Schnorr proofs for both rerandomized votes.
+     *
+     * @throws IllegalArgumentException If the number of votes or swappedVotes does not equal two.
+     */
     private fun generateZKP(
         votes: List<Vote>,
         swappedVotes: List<Vote>,
-        b: Int
-    ): Mixing.Mix2Proof {
+        r1: BigInteger,
+        r2: BigInteger
+    ): ZKPAndProof {
+        require(votes.size == 2) { "Expected exactly 2 original votes." }
+        require(swappedVotes.size == 2) { "Expected exactly 2 swapped votes." }
+
         // Deserialize the votes to extract the ciphertexts
         val aCiphertext = CryptoUtils.unwrapCiphertext(votes[0].getEncryptedMessage())
         val bCiphertext = CryptoUtils.unwrapCiphertext(votes[1].getEncryptedMessage())
@@ -87,21 +107,11 @@ class Switch(
         val cCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[0].getEncryptedMessage())
         val dCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[1].getEncryptedMessage())
 
-//        // Generate proofs for each vote pair
-//        val proof0 = generateSingleZKP(aCiphertext.c1, aCiphertext.c2, cCiphertext.c1, cCiphertext.c2)
-//        val proof1 = generateSingleZKP(bCiphertext.c1, bCiphertext.c2, dCiphertext.c1, dCiphertext.c2)
+        // Generate Schnorr proofs for each rerandomized vote
+        val firstProof = generateSingleZKP(aCiphertext.c1, aCiphertext.c2, cCiphertext.c1, cCiphertext.c2, r1)
+        val secondProof = generateSingleZKP(bCiphertext.c1, bCiphertext.c2, dCiphertext.c1, dCiphertext.c2, r2)
 
-        // Package proofs into Mix2Proof
-        return Mixing.Mix2Proof.newBuilder()
-            .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
-            .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
-            .setLocation(Mixing.Mix2Proof.Location.newBuilder()
-                .setLayer(0)        // Example value; set appropriately
-                .setSwitchIdx(0)    // Example value; set appropriately
-                .setOut0(0)         // Example value; set appropriately
-                .setOut1(1)         // Example value; set appropriately
-                .build())
-            .build()
+        return ZKPAndProof(firstProof, secondProof)
     }
 
     /**
@@ -109,6 +119,17 @@ class Switch(
      * Proves that log_g(X) = log_h(Y), where:
      * X = c1 / a1
      * Y = c2 / a2
+     *
+     * Logic:
+     *     t = random in [0, q-1]
+     *     A_g = g.pow(t)
+     *     A_h = h.pow(t)
+     *
+     *     // Fiat-Shamir challenge
+     *     val c = hashToChallenge(listOf(A_g, A_h, X, Y))
+     *
+     *     val z = (t + c.multiply(r)).mod(q)
+     *     return SchnorrProofDL(A_g, A_h, z)
      *
      * @param a1 The first component of the original ciphertext.
      * @param a2 The second component of the original ciphertext.
@@ -174,6 +195,7 @@ class Switch(
         val c = CryptoUtils.hashToBigInteger(challengeInput).mod(domainParameters.n)
 
         // Compute the response z = t + c * r mod q
+        // Those all are BigInteger operations
         val z = t.add(c.multiply(r)).mod(domainParameters.n)
 
         return SchnorrProofDL(
