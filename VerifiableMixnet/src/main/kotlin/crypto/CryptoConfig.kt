@@ -72,13 +72,8 @@ object CryptoConfig {
     fun generateKeyPair(): KeyPair {
         val keyPairGenerator = KeyPairGenerator.getInstance("EC", "BC")
 
-        // Use a strong SecureRandom implementation
+        // Use default SecureRandom without manual seeding
         val secureRandom = SecureRandom.getInstanceStrong()
-
-        // Add entropy to SecureRandom
-        val seed = ByteArray(32)
-        SecureRandom().nextBytes(seed)
-        secureRandom.setSeed(seed)
 
         val ecSpec = ECGenParameterSpec(EC_CURVE_NAME)
         keyPairGenerator.initialize(ecSpec, secureRandom)
@@ -105,8 +100,8 @@ object CryptoConfig {
             "Private key size exceeds maximum allowed size"
         }
 
-        // Validate private key is in range
-        require(privateKey.d > BigInteger.ONE &&
+        // Validate private key is in range [1, n-1]
+        require(privateKey.d >= BigInteger.ONE &&
                 privateKey.d < privateKey.parameters.n) {
             "Private key out of valid range"
         }

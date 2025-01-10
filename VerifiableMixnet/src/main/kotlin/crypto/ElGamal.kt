@@ -31,11 +31,8 @@ object ElGamal {
      */
     private fun createSecureRandom(): SecureRandom {
         return try {
-            val secureRandom = SecureRandom.getInstanceStrong()
-            val seed = ByteArray(32)
-            SecureRandom().nextBytes(seed)
-            secureRandom.setSeed(seed)
-            secureRandom
+            // Use default SecureRandom without manual seeding
+            SecureRandom.getInstanceStrong()
         } catch (e: Exception) {
             throw IllegalStateException("SecureRandom initialization failed", e)
         }
