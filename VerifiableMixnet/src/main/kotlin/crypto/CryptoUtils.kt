@@ -125,33 +125,4 @@ object CryptoUtils {
         return BigInteger(1, digest)
     }
 
-
-//TODO: delete?
-
-//    /**
-//     * Serializes an ElGamalCiphertext into bytes.
-//     *
-//     * @param ciphertext The ElGamalCiphertext to serialize.
-//     * @return The serialized byte array.
-//     */
-//    fun serializeCiphertext(ciphertext: ElGamalCiphertext): ByteArray {
-//        return ciphertext.toByteArray()
-//    }
-//
-//    /**
-//     * Deserializes bytes into an ElGamalCiphertext.
-//     *
-//     * @param data The byte array to deserialize.
-//     * @return The ElGamalCiphertext.
-//     */
-//    fun deserializeCiphertext(data: ByteArray): ElGamalCiphertext {
-//        return ElGamalCiphertext.parseFrom(data)
-//    }
-//
-//    /**
-//     * Extension function to convert ByteString to Hex string.
-//     */
-//    fun ByteString.toHex(): String {
-//        return Hex.toHexString(this.toByteArray())
-//    }
 }

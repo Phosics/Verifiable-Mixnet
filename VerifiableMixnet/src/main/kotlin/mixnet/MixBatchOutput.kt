@@ -2,7 +2,7 @@ package org.example.mixnet
 
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
-import org.example.MixnetTest.toHex
+import org.bouncycastle.util.encoders.Hex.toHexString
 
 /**
  * Encapsulates the serialized output of a mix batch.
@@ -104,6 +104,13 @@ data class MixBatchOutput(
         // For now, return true if the proof is the default instance
 //        println("proof: $proof\t default: ${Mixing.Mix2Proof.getDefaultInstance()}")
         return proof == defaultProof
+    }
+
+    /**
+     * Extension function to convert ByteArray to hex string.
+     */
+    fun ByteArray.toHex(): String {
+        return org.bouncycastle.util.encoders.Hex.toHexString(this)
     }
 
 }

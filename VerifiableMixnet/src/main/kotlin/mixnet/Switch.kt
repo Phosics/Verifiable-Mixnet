@@ -86,19 +86,15 @@ class Switch(
 
         // Package proofs into Mix2Proof
         return Mixing.Mix2Proof.newBuilder()
-//            .addProofs(
-//                Mixing.Proof.newBuilder()
-//                    .setR(ByteString.copyFrom(proof0.first))
-//                    .setS(ByteString.copyFrom(proof0.second))
-//                    .build()
-//            )
-//            .addProofs(
-//                Mixing.Proof.newBuilder()
-//                    .setR(ByteString.copyFrom(proof1.first))
-//                    .setS(ByteString.copyFrom(proof1.second))
-//                    .build()
-//            )
-//            .build()
+            .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
+            .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
+            .setLocation(Mixing.Mix2Proof.Location.newBuilder()
+                .setLayer(0)        // Example value; set appropriately
+                .setSwitchIdx(0)    // Example value; set appropriately
+                .setOut0(0)         // Example value; set appropriately
+                .setOut1(1)         // Example value; set appropriately
+                .build())
+            .build()
     }
 
     private fun generateSingleZKP(
@@ -135,7 +131,8 @@ class Switch(
         val c = CryptoUtils.hashToBigInteger(uBytes).mod(domainParameters.n)
 
         // Compute z = r + c * x mod n
-        val z = r.add(c.multiply(x)).mod(domainParameters.n)
+//        val z = r.add(c.multiply(x)).mod(domainParameters.n)
+        val z = r
 
         // Serialize z
         val zBytes = z.toByteArray()

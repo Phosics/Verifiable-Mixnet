@@ -7,6 +7,7 @@ import org.bouncycastle.math.ec.ECPoint
 import com.google.protobuf.ByteString
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
+import org.example.crypto.CryptoUtils
 import org.example.crypto.ElGamal
 import org.example.crypto.KeySerialization
 import java.security.Security
@@ -41,19 +42,19 @@ fun main() {
 
         // Rerandomize the ciphertext twice
         val firstRerandomizedCiphertext = ElGamal.rerandomizeCiphertext(
-            ElGamal.deserializeCiphertext(encryptedMessage),
+            CryptoUtils.unwrapCiphertext(encryptedMessage),
             publicKey,
             domainParameters
         )
-        val firstRerandomizedMessage = ElGamal.serializeCiphertext(firstRerandomizedCiphertext)
+        val firstRerandomizedMessage = CryptoUtils.wrapCiphertext(firstRerandomizedCiphertext)
         println("First Rerandomized Encrypted Message: ${firstRerandomizedMessage.data.toHex()}")
 
         val secondRerandomizedCiphertext = ElGamal.rerandomizeCiphertext(
-            ElGamal.deserializeCiphertext(firstRerandomizedMessage),
+            CryptoUtils.unwrapCiphertext(firstRerandomizedMessage),
             publicKey,
             domainParameters
         )
-        val secondRerandomizedMessage = ElGamal.serializeCiphertext(secondRerandomizedCiphertext)
+        val secondRerandomizedMessage = CryptoUtils.wrapCiphertext(secondRerandomizedCiphertext)
         println("Second Rerandomized Encrypted Message: ${secondRerandomizedMessage.data.toHex()}")
 
         // Decrypt the final ciphertext

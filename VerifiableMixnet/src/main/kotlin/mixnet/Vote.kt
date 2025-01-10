@@ -3,6 +3,7 @@ package org.example.mixnet
 import org.example.crypto.ElGamal
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
+import org.example.crypto.CryptoUtils
 import java.security.PublicKey
 
 /**
@@ -29,13 +30,13 @@ data class Vote(
      */
     fun addRandomness(publicKey: PublicKey, domainParameters: ECDomainParameters): Vote {
         // Deserialize the current ciphertext
-        val elGamalCiphertext = ElGamal.deserializeCiphertext(encryptedMessage)
+        val elGamalCiphertext = CryptoUtils.unwrapCiphertext(encryptedMessage)
 
         // Rerandomize the ciphertext using EC-ElGamal rerandomization
         val rerandomizedCiphertext = ElGamal.rerandomizeCiphertext(elGamalCiphertext, publicKey, domainParameters)
 
         // Serialize the rerandomized ciphertext back to RerandomizableEncryptedMessage
-        val rerandomizedMessage = ElGamal.serializeCiphertext(rerandomizedCiphertext)
+        val rerandomizedMessage = CryptoUtils.wrapCiphertext(rerandomizedCiphertext)
 
         // Return a new Vote instance with the rerandomized ciphertext
         return copy(encryptedMessage = rerandomizedMessage)

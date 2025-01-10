@@ -174,26 +174,6 @@ object ElGamal {
     }
 
     /**
-     * Serializes an ElGamalCiphertext into a RerandomizableEncryptedMessage.
-     *
-     * @param ciphertext The ElGamalCiphertext to serialize.
-     * @return The RerandomizableEncryptedMessage containing the ciphertext.
-     */
-    fun serializeCiphertext(ciphertext: ElGamalCiphertext): RerandomizableEncryptedMessage {
-        return CryptoUtils.wrapCiphertext(ciphertext)
-    }
-
-    /**
-     * Deserializes a RerandomizableEncryptedMessage into an ElGamalCiphertext.
-     *
-     * @param encryptedMessage The RerandomizableEncryptedMessage to deserialize.
-     * @return The ElGamalCiphertext.
-     */
-    fun deserializeCiphertext(encryptedMessage: RerandomizableEncryptedMessage): ElGamalCiphertext {
-        return CryptoUtils.unwrapCiphertext(encryptedMessage)
-    }
-
-    /**
      * Validates that the given ECPoint is on the curve defined by the domain parameters.
      *
      * @param point The ECPoint to validate.

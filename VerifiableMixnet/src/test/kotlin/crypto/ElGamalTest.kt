@@ -4,6 +4,7 @@ import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
+import org.example.crypto.CryptoUtils
 import org.example.crypto.ElGamal
 import java.security.KeyPair
 import java.security.Security
@@ -52,9 +53,9 @@ object ElGamalTest {
                 // Rerandomize the ciphertext 20 times
                 var rerandomizedMessage = encryptedMessage
                 repeat(RERANDOMIZATION_COUNT) { rerandIndex ->
-                    val ciphertext = ElGamal.deserializeCiphertext(rerandomizedMessage)
+                    val ciphertext = CryptoUtils.unwrapCiphertext(rerandomizedMessage)
                     val rerandomizedCiphertext = ElGamal.rerandomizeCiphertext(ciphertext, publicKey, domainParameters)
-                    rerandomizedMessage = ElGamal.serializeCiphertext(rerandomizedCiphertext)
+                    rerandomizedMessage = CryptoUtils.wrapCiphertext(rerandomizedCiphertext)
                 }
 
                 // Decrypt the final ciphertext
