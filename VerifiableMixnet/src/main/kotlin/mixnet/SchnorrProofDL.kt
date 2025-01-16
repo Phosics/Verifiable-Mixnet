@@ -41,3 +41,25 @@ data class ZKPOrProof(
     val fullChallenge: BigInteger
 )
 
+/**
+ * A partial real commit for a Schnorr sub-proof:
+ *    We store (A_g, A_h) plus the secret t we used.
+ *    We'll finalize once we learn the actual challenge c.
+ */
+data class SchnorrCommitReal(
+    val A_g: GroupElement,
+    val A_h: GroupElement,
+    val t: BigInteger
+)
+
+/**
+ * A one-shot fake commit for a Schnorr sub-proof:
+ *    We store (A_g, A_h) plus the "fake" challenge cFake and exponent zFake.
+ *    We never need to finalize, because it's all decided up-front.
+ */
+data class SchnorrCommitFake(
+    val A_g: GroupElement,
+    val A_h: GroupElement,
+    val cFake: BigInteger,
+    val zFake: BigInteger
+)

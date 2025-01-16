@@ -81,4 +81,7 @@ class ZKPTest {
         }
 
     }
+    object test2{
+
+    }
 }

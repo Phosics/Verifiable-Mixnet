@@ -5,6 +5,7 @@ import org.bouncycastle.asn1.x509.ObjectDigestInfo.publicKey
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.BigIntegerUtils
 import org.example.crypto.CryptoUtils
+import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.security.PublicKey
@@ -14,27 +15,7 @@ object ZKPUtils {
 
     /**
      * Generates a real Schnorr Discrete-Log-Equality Proof.
-     * Proves that log_g(X) = log_h(Y), where:
-     * X = c1 / a1
-     * Y = c2 / a2
-     *
-     * Logic:
-     *     t = random in [0, q-1]
-     *     A_g = g.pow(t)
-     *     A_h = h.pow(t)
-     *
-     *     // Fiat-Shamir challenge
-     *     val c = hashToChallenge(listOf(A_g, A_h, X, Y))
-     *
-     *     val z = (t + c.multiply(r)).mod(q)
-     *     return SchnorrProofDL(A_g, A_h, z)
-     *
-     * @param a1 The first component of the original ciphertext.
-     * @param a2 The second component of the original ciphertext.
-     * @param c1 The first component of the rerandomized ciphertext.
-     * @param c2 The second component of the rerandomized ciphertext.
-     * @param r The randomness used in rerandomization.
-     * @return An instance of SchnorrProofDL containing A_g, A_h, and z.
+     * (Unchanged from before.)
      */
     fun generateSingleZKP(
         a1: GroupElement,
@@ -45,149 +26,94 @@ object ZKPUtils {
         publicKey: PublicKey,
         domainParameters: ECDomainParameters
     ): SchnorrProofDL {
-        // 1) Deserialize
+        // Deserialize inputs.
         val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
         val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
         val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
         val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
         val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
 
-        // 2) X = c1 - a1, Y = c2 - a2
+        // Compute X = c1 – a1 and Y = c2 – a2.
         val XPoint = c1Point.add(a1Point.negate()).normalize()
         val YPoint = c2Point.add(a2Point.negate()).normalize()
 
-        // 3) t random, A_g = G^t, A_h = H^t
+        // Choose ephemeral t and compute commitments.
         val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
         val A_gPoint = domainParameters.g.multiply(t).normalize()
         val A_hPoint = hPoint.multiply(t).normalize()
 
-        // 4) Compute challenge c from (A_g, A_h, X, Y)
+        // Serialize the group elements.
         val A_gSer = CryptoUtils.serializeGroupElement(A_gPoint)
         val A_hSer = CryptoUtils.serializeGroupElement(A_hPoint)
         val XSer   = CryptoUtils.serializeGroupElement(XPoint)
         val YSer   = CryptoUtils.serializeGroupElement(YPoint)
 
+        // Compute challenge using Fiat–Shamir.
         val c = hashChallenge(A_gSer, A_hSer, XSer, YSer, publicKey, domainParameters)
 
-        // 5) z = t + c*r mod n
+        // Response: z = t + c*r mod n.
         val z = t.add(c.multiply(r)).mod(domainParameters.n)
-
-        // Return the proof
         return SchnorrProofDL(A_gSer, A_hSer, z)
     }
 
     /**
-     * A small helper that does your usual ByteBuffer + hash => BigInteger mod n.
-     */
-    private fun hashChallenge(
-        A_gSer: GroupElement,
-        A_hSer: GroupElement,
-        XSer: GroupElement,
-        YSer: GroupElement,
-        publicKey: PublicKey,
-        domainParameters: ECDomainParameters
-    ): BigInteger {
-        val A_gBytes = A_gSer.data.toByteArray()
-        val A_hBytes = A_hSer.data.toByteArray()
-        val XBytes   = XSer.data.toByteArray()
-        val YBytes   = YSer.data.toByteArray()
-
-        val buf = ByteBuffer.allocate(
-            A_gBytes.size + A_hBytes.size + XBytes.size + YBytes.size
-        )
-        buf.put(A_gBytes)
-        buf.put(A_hBytes)
-        buf.put(XBytes)
-        buf.put(YBytes)
-
-        val cRaw = CryptoUtils.hashToBigInteger(buf.array())
-        return cRaw.mod(domainParameters.n)
-    }
-
-
-    /**
-     * Creates a *fake* Schnorr DLEQ proof for the statement "X = c1 - a1, Y = c2 - a2"
-     * *without* knowing r, using the standard 'rewinding' approach.
+     * (One-shot fake simulation)
      *
-     * We want to produce (A_g, A_h, z) that passes:
-     *    c = H(A_g, A_h, X, Y)
-     *    z * G == A_g + c * X
-     *    z * H == A_h + c * Y
-     * in additive notation.
+     * Simulates a Schnorr proof “in one shot” without rewinding. In a sigma‑protocol OR‑proof,
+     * it is acceptable to choose a fake challenge and response arbitrarily then compute the fake
+     * commitment as:
      *
-     * We'll try random "cCandidate" and "zCandidate" until the final hashed c = cCandidate.
+     *    A_g = zFake*G – cFake*X
+     *    A_h = zFake*H – cFake*Y
+     *
+     * Later, when the global challenge is computed, the fake branch’s challenge is simply used as-is.
      */
-    private fun simulateSingleZKP(
+    private fun simulateFakeSubProof(
         a1: GroupElement,
         a2: GroupElement,
         c1: GroupElement,
         c2: GroupElement,
         publicKey: PublicKey,
         domainParameters: ECDomainParameters
-    ): SchnorrProofDL {
+    ): SchnorrCommitFake {
         val n = domainParameters.n
         val rnd = SecureRandom.getInstanceStrong()
 
-        // 1) Deserialize
+        // Deserialize to compute X and Y.
         val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
         val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
         val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
         val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
         val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
-
-        // 2) X = c1 - a1, Y = c2 - a2
         val XPoint = c1Point.add(a1Point.negate()).normalize()
         val YPoint = c2Point.add(a2Point.negate()).normalize()
 
-        // We'll do repeated "rewinding":
-        //   pick cCandidate, zCandidate
-        //   define A_g = zCandidate*G - cCandidate*X
-        //   define A_h = zCandidate*H - cCandidate*Y
-        //   then cCheck = H(A_g, A_h, X, Y)
-        //   if cCheck == cCandidate => success
-        // This ensures standard verify will pass.
+        // One-shot: pick random fake challenge and response.
+        val cFake = BigIntegerUtils.randomBigInteger(n, rnd)
+        val zFake = BigIntegerUtils.randomBigInteger(n, rnd)
 
-        while (true) {
-            println(a1Point)
-            val cCandidate = BigIntegerUtils.randomBigInteger(n, rnd)
-            val zCandidate = BigIntegerUtils.randomBigInteger(n, rnd)
+        // Compute the fake commitments.
+        val A_gPoint = domainParameters.g.multiply(zFake)
+            .subtract(XPoint.multiply(cFake)).normalize()
+        val A_hPoint = hPoint.multiply(zFake)
+            .subtract(YPoint.multiply(cFake)).normalize()
 
-            // A_g = zCandidate*G - cCandidate*X
-            val A_gPoint = domainParameters.g.multiply(zCandidate)
-                .add(XPoint.multiply(cCandidate).negate()).normalize()
-
-            // A_h = zCandidate*H - cCandidate*Y
-            val A_hPoint = hPoint.multiply(zCandidate)
-                .add(YPoint.multiply(cCandidate).negate()).normalize()
-
-            // Now compute cCheck from FS
-            val A_gSer = CryptoUtils.serializeGroupElement(A_gPoint)
-            val A_hSer = CryptoUtils.serializeGroupElement(A_hPoint)
-            val XSer   = CryptoUtils.serializeGroupElement(XPoint)
-            val YSer   = CryptoUtils.serializeGroupElement(YPoint)
-
-            val cCheck = hashChallenge(A_gSer, A_hSer, XSer, YSer, publicKey, domainParameters)
-
-            if (cCheck == cCandidate) {
-                // That means the standard verify will pass with c=cCandidate, z=zCandidate.
-                return SchnorrProofDL(A_gSer, A_hSer, zCandidate)
-            }
-            // else try again
-        }
+        return SchnorrCommitFake(
+            A_g = CryptoUtils.serializeGroupElement(A_gPoint),
+            A_h = CryptoUtils.serializeGroupElement(A_hPoint),
+            cFake = cFake,
+            zFake = zFake
+        )
     }
 
     /**
-     * Proves (in zero knowledge) that either:
-     *    1) c is re-encryption of a & d is re-encryption of b
-     * OR 2) c is re-encryption of b & d is re-encryption of a
-     * without revealing which is the case.
+     * Generates an OR‑proof that shows that EITHER
+     *   (A→C and B→D are a re‑encryption) is the real branch
+     * OR
+     *   (B→C and A→D) is the real branch.
      *
-     * @param a1,a2 : ciphertext A
-     * @param b1,b2 : ciphertext B
-     * @param c1,c2 : ciphertext C
-     * @param d1,d2 : ciphertext D
-     * @param rC, rD: the randomness used for re-encrypting the "true" side
-     * @param switchFlag: 0 => (A->C, B->D) is real; 1 => (B->C, A->D) is real
+     * The simulation for the fake branch uses the one-shot fake simulation (above).
+     * (The ordering of parameters is made explicit.)
      */
     fun generateOrProof(
         a1: GroupElement, a2: GroupElement,
@@ -202,66 +128,84 @@ object ZKPUtils {
     ): ZKPOrProof {
         require(switchFlag == 0 || switchFlag == 1)
 
-        // 1) Real side: we have the witness
-        val realSide = if (switchFlag == 0) {
-            // "A" side is real => (c reencrypt a, d reencrypt b)
-            ZKPAndProof(
-                generateSingleZKP(a1, a2, c1, c2, rC, publicKey, domainParameters),
-                generateSingleZKP(b1, b2, d1, d2, rD, publicKey, domainParameters)
-            )
-        } else {
-            // "B" side is real => (c reencrypt b, d reencrypt a)
-            ZKPAndProof(
-                generateSingleZKP(b1, b2, c1, c2, rC, publicKey, domainParameters),
-                generateSingleZKP(a1, a2, d1, d2, rD, publicKey, domainParameters)
-            )
-        }
-
-        // 2) Simulated side: we do NOT have the witness. We'll do the slow rewinding approach for each sub-proof
-        val falseSide = if (switchFlag == 0) {
-            // "B" side is fake => (c reencrypt b, d reencrypt a)
-            ZKPAndProof(
-                simulateSingleZKP(b1, b2, c1, c2, publicKey, domainParameters),
-                simulateSingleZKP(a1, a2, d1, d2, publicKey, domainParameters)
-            )
-        } else {
-            // "A" side is fake => (c reencrypt a, d reencrypt b)
-            ZKPAndProof(
-                simulateSingleZKP(a1, a2, c1, c2, publicKey, domainParameters),
-                simulateSingleZKP(b1, b2, d1, d2, publicKey, domainParameters)
-            )
-        }
-
-        // 3) Combine commitments from both AND-proofs => global challenge e
-        val e = computeGlobalChallenge(realSide, falseSide, domainParameters)
-
-        // 4) Split e = eA + eB
-        val eA = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
-        val eB = e.subtract(eA).mod(domainParameters.n)
-
-        // Assign them:
-        // If switchFlag=0 => realSide is "A" => it should use eA; falseSide is "B" => uses eB.
-        // If switchFlag=1 => realSide is "B" => it should use eB; falseSide is "A" => uses eA.
-        val challengeA: BigInteger
-        val challengeB: BigInteger
-        val proofA: ZKPAndProof
-        val proofB: ZKPAndProof
+        // Determine which branch is real and which is fake.
+        val real1_a1: FiveTuple
+        val real2_a1: FiveTuple
+        val fake1_a1: FourTuple
+        val fake2_a1: FourTuple
 
         if (switchFlag == 0) {
-            // real => A
-            proofA = finalizeRealProof(realSide, eA)
-            proofB = adjustSimulatedProof(falseSide, eB, /*A or B?*/ false, publicKey, domainParameters)
-            challengeA = eA
-            challengeB = eB
+            // Real branch: (A → C, B → D)
+            real1_a1 = FiveTuple(a1, a2, c1, c2, rC)
+            real2_a1 = FiveTuple(b1, b2, d1, d2, rD)
+            // Fake branch: (B → C, A → D)
+            fake1_a1 = FourTuple(b1, b2, c1, c2)
+            fake2_a1 = FourTuple(a1, a2, d1, d2)
         } else {
-            // real => B
-            proofA = adjustSimulatedProof(falseSide, eA, /*A or B?*/ true, publicKey, domainParameters)
-            proofB = finalizeRealProof(realSide, eB)
-            challengeA = eA
-            challengeB = eB
+            // Real branch: (B → C, A → D)
+            real1_a1 = FiveTuple(b1, b2, c1, c2, rC)
+            real2_a1 = FiveTuple(a1, a2, d1, d2, rD)
+            // Fake branch: (A → C, B → D)
+            fake1_a1 = FourTuple(a1, a2, c1, c2)
+            fake2_a1 = FourTuple(b1, b2, d1, d2)
         }
 
-        // 5) Return the OR-proof
+        // 1) Compute commitments for the real branch.
+        val realCommit1 = commitRealSubProof(
+            real1_a1.a1, real1_a1.a2, real1_a1.c1, real1_a1.c2, real1_a1.r,
+            publicKey, domainParameters
+        )
+        val realCommit2 = commitRealSubProof(
+            real2_a1.a1, real2_a1.a2, real2_a1.c1, real2_a1.c2, real2_a1.r,
+            publicKey, domainParameters
+        )
+
+        // 2) Simulate commitments for the fake branch (one-shot).
+        val fakeCommit1 = simulateFakeSubProof(
+            fake1_a1.a1, fake1_a1.a2, fake1_a1.c1, fake1_a1.c2,
+            publicKey, domainParameters
+        )
+        val fakeCommit2 = simulateFakeSubProof(
+            fake2_a1.a1, fake2_a1.a2, fake2_a1.c1, fake2_a1.c2,
+            publicKey, domainParameters
+        )
+
+        // 3) Compute the global challenge. Here we use a dynamically built byte array
+        //    so that only the exact commitment bytes are hashed (avoiding extra padding).
+        val baos = ByteArrayOutputStream()
+        fun putCommit(A_g: GroupElement, A_h: GroupElement) {
+            baos.write(A_g.data.toByteArray())
+            baos.write(A_h.data.toByteArray())
+        }
+        putCommit(realCommit1.A_g, realCommit1.A_h)
+        putCommit(realCommit2.A_g, realCommit2.A_h)
+        putCommit(fakeCommit1.A_g, fakeCommit1.A_h)
+        putCommit(fakeCommit2.A_g, fakeCommit2.A_h)
+        val eBytes = baos.toByteArray()
+        val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
+
+        // 4) Set the real branch’s challenge to be:
+        //    cReal = e – (cFake1 + cFake2) mod n.
+        val cFakeTotal = fakeCommit1.cFake.add(fakeCommit2.cFake).mod(domainParameters.n)
+        val cReal = e.subtract(cFakeTotal).mod(domainParameters.n)
+
+        // 5) Finalize the real branch by computing responses with the challenge cReal.
+        val proofReal1 = finalizeRealSubProof(realCommit1, cReal, real1_a1.r, domainParameters)
+        val proofReal2 = finalizeRealSubProof(realCommit2, cReal, real2_a1.r, domainParameters)
+
+        // 6) The fake branch proofs are taken directly from the simulation.
+        val proofFake1 = SchnorrProofDL(fakeCommit1.A_g, fakeCommit1.A_h, fakeCommit1.zFake)
+        val proofFake2 = SchnorrProofDL(fakeCommit2.A_g, fakeCommit2.A_h, fakeCommit2.zFake)
+
+        val realAnd = ZKPAndProof(proofReal1, proofReal2)
+        val fakeAnd = ZKPAndProof(proofFake1, proofFake2)
+
+        val (challengeA, challengeB, proofA, proofB) =
+            if (switchFlag == 0)
+                Quadruple(cReal, cFakeTotal, realAnd, fakeAnd)
+            else
+                Quadruple(cFakeTotal, cReal, fakeAnd, realAnd)
+
         return ZKPOrProof(
             proofA = proofA,
             proofB = proofB,
@@ -272,150 +216,87 @@ object ZKPUtils {
     }
 
     /**
-     * Gathers the commitments (A_g, A_h) from each subproof in realSide + falseSide,
-     * concatenates them, and hashes => e (the "global" challenge).
+     * Helper: Computes a Fiat–Shamir challenge from the given commitments.
+     * We build a dynamic byte array (via ByteArrayOutputStream) to avoid unused padding.
      */
-    private fun computeGlobalChallenge(
-        realSide: ZKPAndProof,
-        falseSide: ZKPAndProof,
+    private fun hashChallenge(
+        A_gSer: GroupElement,
+        A_hSer: GroupElement,
+        XSer: GroupElement,
+        YSer: GroupElement,
+        publicKey: PublicKey,
         domainParameters: ECDomainParameters
     ): BigInteger {
-        // We'll just gather (A_g, A_h) of each subproof (4 total).
-        val buf = ByteBuffer.allocate(4096)
-
-        // Helper:
-        fun putProofDL(p: SchnorrProofDL) {
-            buf.put(p.A_g.data.toByteArray())
-            buf.put(p.A_h.data.toByteArray())
-        }
-
-        putProofDL(realSide.proof1)
-        putProofDL(realSide.proof2)
-        putProofDL(falseSide.proof1)
-        putProofDL(falseSide.proof2)
-
-        val cRaw = CryptoUtils.hashToBigInteger(buf.array())
+        val baos = ByteArrayOutputStream()
+        baos.write(A_gSer.data.toByteArray())
+        baos.write(A_hSer.data.toByteArray())
+        baos.write(XSer.data.toByteArray())
+        baos.write(YSer.data.toByteArray())
+        val combined = baos.toByteArray()
+        val cRaw = CryptoUtils.hashToBigInteger(combined)
         return cRaw.mod(domainParameters.n)
     }
 
     /**
-     * For a "real" AND-proof that was built with generateSingleZKP,
-     * we re-hash its (A_g, A_h, X, Y) to get c', compare with the partial eX we want.
-     * Strictly, you'd do a sophisticated approach to ensure c'= eX, etc.
-     * For simplicity, we won't forcibly overwrite anything here
-     * because generateSingleZKP already closes the loop with FS.
+     * Commits a real sub-proof by choosing a random ephemeral exponent t,
+     * and computing A_g = G^t and A_h = H^t.
      */
-    private fun finalizeRealProof(
-        realProof: ZKPAndProof,
-        partialChallenge: BigInteger
-    ): ZKPAndProof {
-        // In a perfect Sigma-OR, you'd "re-randomize" your commitments so that
-        // the final challenge is partialChallenge. But that again is advanced.
-        // We'll simply return the realProof as-is.
-        // (In real production code, you'd unify the partial-challenge approach from the start.)
-        // TODO: deal with this message
-        return realProof
+    private fun commitRealSubProof(
+        a1: GroupElement,
+        a2: GroupElement,
+        c1: GroupElement,
+        c2: GroupElement,
+        r: BigInteger,
+        publicKey: PublicKey,
+        domainParameters: ECDomainParameters
+    ): SchnorrCommitReal {
+        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
+        val A_gPoint = domainParameters.g.multiply(t).normalize()
+        val hPoint = CryptoUtils.extractECPointFromPublicKey(publicKey)
+        val A_hPoint = hPoint.multiply(t).normalize()
+        return SchnorrCommitReal(
+            A_g = CryptoUtils.serializeGroupElement(A_gPoint),
+            A_h = CryptoUtils.serializeGroupElement(A_hPoint),
+            t   = t
+        )
     }
 
     /**
-     * For a "fake" AND-proof that was built with simulateSingleZKP,
-     * each sub-proof used a random cCandidate.
-     * Now we want to unify it with partialChallenge.
-     *
-     * The correct approach is to "simulate again" *with knowledge* that we want
-     * final c = partialChallenge. That means we do a rewinding approach until
-     * cCandidate = partialChallenge. We'll do it for each sub-proof.
+     * Finalizes a real sub-proof by computing z = t + (challengeReal * r) mod n.
      */
-    private fun adjustSimulatedProof(
-        falseProof: ZKPAndProof,
-        partialChallenge: BigInteger,
-        isASide: Boolean,
-        publicKey: PublicKey,
+    private fun finalizeRealSubProof(
+        commit: SchnorrCommitReal,
+        challengeReal: BigInteger,
+        r: BigInteger,
         domainParameters: ECDomainParameters
-    ): ZKPAndProof {
-        // We'll just re-simulate each sub-proof with a forced challenge = partialChallenge
-        // so that the final verification sees the same partialChallenge.
-
-        // Subfunction that tries until cCandidate == partialChallenge:
-        fun reSimulateFixedChallenge(
-            a1: GroupElement,
-            a2: GroupElement,
-            c1: GroupElement,
-            c2: GroupElement,
-            forcedChallenge: BigInteger,    
-            publicKey: PublicKey,
-            domainParameters: ECDomainParameters
-        ): SchnorrProofDL {
-            val n = domainParameters.n
-            val rnd = SecureRandom.getInstanceStrong()
-
-            val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
-            val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
-            val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
-            val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
-            val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
-
-            val XPoint = c1Point.add(a1Point.negate()).normalize()
-            val YPoint = c2Point.add(a2Point.negate()).normalize()
-
-            while (true) {
-                // pick random zCandidate
-                val zCandidate = BigIntegerUtils.randomBigInteger(n, rnd)
-
-                // A_g = zCandidate*G - forcedChallenge*X
-                val A_gPoint = domainParameters.g.multiply(zCandidate)
-                    .add(XPoint.multiply(forcedChallenge).negate()).normalize()
-
-                // A_h = zCandidate*H - forcedChallenge*Y
-                val A_hPoint = hPoint.multiply(zCandidate)
-                    .add(YPoint.multiply(forcedChallenge).negate()).normalize()
-
-                // Check if hash == forcedChallenge
-                val A_gSer = CryptoUtils.serializeGroupElement(A_gPoint)
-                val A_hSer = CryptoUtils.serializeGroupElement(A_hPoint)
-                val XSer   = CryptoUtils.serializeGroupElement(XPoint)
-                val YSer   = CryptoUtils.serializeGroupElement(YPoint)
-
-                val cCheck = hashChallenge(A_gSer, A_hSer, XSer, YSer, publicKey, domainParameters)
-                if (cCheck == forcedChallenge) {
-                    return SchnorrProofDL(A_gSer, A_hSer, zCandidate)
-                }
-            }
-        }
-
-        // We have to know which pairs we are "simulating" here.
-        // If isASide==true, that means this "fake" proof is for (c reencrypt a, d reencrypt b).
-        // If isASide==false, that means it's for (c reencrypt b, d reencrypt a).
-        // But actually we can glean the pairs from the original sub-proof.
-
-        // For simplicity, let's assume your code carefully sets the correct pairs in the calling method:
-        // We'll just re-simulate with the same input a1,a2, c1,c2 that was used originally.
-
-        val newFirst = reSimulateFixedChallenge(
-            // We do not store which ciphertext pair was used in the proof1 if we just have "SchnorrProofDL".
-            // So we assume you track that. For demonstration, let's pretend we do:
-            /* placeholders: you must pass the actual (a1,a2,c1,c2) that the falseProof corresponds to */
-            a1 = falseProof.proof1.A_g, // obviously not correct in a real system
-            a2 = falseProof.proof1.A_h,
-            c1 = falseProof.proof1.A_g,
-            c2 = falseProof.proof1.A_h,
-            forcedChallenge = partialChallenge,
-            publicKey = publicKey,
-            domainParameters = domainParameters
+    ): SchnorrProofDL {
+        val z = commit.t.add(challengeReal.multiply(r)).mod(domainParameters.n)
+        return SchnorrProofDL(
+            A_g = commit.A_g,
+            A_h = commit.A_h,
+            z   = z
         )
-        val newSecond = reSimulateFixedChallenge(
-            /* placeholders again */
-            a1 = falseProof.proof2.A_g,
-            a2 = falseProof.proof2.A_h,
-            c1 = falseProof.proof2.A_g,
-            c2 = falseProof.proof2.A_h,
-            forcedChallenge = partialChallenge,
-            publicKey = publicKey,
-            domainParameters = domainParameters
-        )
-
-        return ZKPAndProof(newFirst, newSecond)
     }
-
 }
 
+/**
+ * A helper data class (and alias) to hold four values.
+ */
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+/**
+ * Tuple classes for organizing parameters.
+ */
+private data class FiveTuple(
+    val a1: GroupElement,
+    val a2: GroupElement,
+    val c1: GroupElement,
+    val c2: GroupElement,
+    val r:  BigInteger
+)
+private data class FourTuple(
+    val a1: GroupElement,
+    val a2: GroupElement,
+    val c1: GroupElement,
+    val c2: GroupElement
+)
