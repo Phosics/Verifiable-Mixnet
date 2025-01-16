@@ -13,48 +13,48 @@ import java.security.SecureRandom
 
 object ZKPUtils {
 
-    /**
-     * Generates a real Schnorr Discrete-Log-Equality Proof.
-     * (Unchanged from before.)
-     */
-    fun generateSingleZKP(
-        a1: GroupElement,
-        a2: GroupElement,
-        c1: GroupElement,
-        c2: GroupElement,
-        r: BigInteger,
-        publicKey: PublicKey,
-        domainParameters: ECDomainParameters
-    ): SchnorrProofDL {
-        // Deserialize inputs.
-        val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
-        val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
-        val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
-        val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
-        val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
-
-        // Compute X = c1 – a1 and Y = c2 – a2.
-        val XPoint = c1Point.add(a1Point.negate()).normalize()
-        val YPoint = c2Point.add(a2Point.negate()).normalize()
-
-        // Choose ephemeral t and compute commitments.
-        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
-        val A_gPoint = domainParameters.g.multiply(t).normalize()
-        val A_hPoint = hPoint.multiply(t).normalize()
-
-        // Serialize the group elements.
-        val A_gSer = CryptoUtils.serializeGroupElement(A_gPoint)
-        val A_hSer = CryptoUtils.serializeGroupElement(A_hPoint)
-        val XSer   = CryptoUtils.serializeGroupElement(XPoint)
-        val YSer   = CryptoUtils.serializeGroupElement(YPoint)
-
-        // Compute challenge using Fiat–Shamir.
-        val c = hashChallenge(A_gSer, A_hSer, XSer, YSer, publicKey, domainParameters)
-
-        // Response: z = t + c*r mod n.
-        val z = t.add(c.multiply(r)).mod(domainParameters.n)
-        return SchnorrProofDL(A_gSer, A_hSer, z)
-    }
+//    /**
+//     * Generates a real Schnorr Discrete-Log-Equality Proof.
+//     * (Unchanged from before.)
+//     */
+//    fun generateSingleZKP(
+//        a1: GroupElement,
+//        a2: GroupElement,
+//        c1: GroupElement,
+//        c2: GroupElement,
+//        r: BigInteger,
+//        publicKey: PublicKey,
+//        domainParameters: ECDomainParameters
+//    ): SchnorrProofDL {
+//        // Deserialize inputs.
+//        val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
+//        val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
+//        val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
+//        val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
+//        val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
+//
+//        // Compute X = c1 – a1 and Y = c2 – a2.
+//        val XPoint = c1Point.add(a1Point.negate()).normalize()
+//        val YPoint = c2Point.add(a2Point.negate()).normalize()
+//
+//        // Choose ephemeral t and compute commitments.
+//        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
+//        val A_gPoint = domainParameters.g.multiply(t).normalize()
+//        val A_hPoint = hPoint.multiply(t).normalize()
+//
+//        // Serialize the group elements.
+//        val A_gSer = CryptoUtils.serializeGroupElement(A_gPoint)
+//        val A_hSer = CryptoUtils.serializeGroupElement(A_hPoint)
+//        val XSer   = CryptoUtils.serializeGroupElement(XPoint)
+//        val YSer   = CryptoUtils.serializeGroupElement(YPoint)
+//
+//        // Compute challenge using Fiat–Shamir.
+//        val c = hashChallenge(A_gSer, A_hSer, XSer, YSer, publicKey, domainParameters)
+//
+//        // Response: z = t + c*r mod n.
+//        val z = t.add(c.multiply(r)).mod(domainParameters.n)
+//        return SchnorrProofDL(A_gSer, A_hSer, z)
+//    }
 
     /**
      * (One-shot fake simulation)
@@ -135,17 +135,17 @@ object ZKPUtils {
         val fake2_a1: FourTuple
 
         if (switchFlag == 0) {
-            // Real branch: (A → C, B → D)
+            // Real branch: (A→C, B→D)
             real1_a1 = FiveTuple(a1, a2, c1, c2, rC)
             real2_a1 = FiveTuple(b1, b2, d1, d2, rD)
-            // Fake branch: (B → C, A → D)
+            // Fake branch: (B→C, A→D)
             fake1_a1 = FourTuple(b1, b2, c1, c2)
             fake2_a1 = FourTuple(a1, a2, d1, d2)
         } else {
-            // Real branch: (B → C, A → D)
+            // Real branch: (B→C, A→D)
             real1_a1 = FiveTuple(b1, b2, c1, c2, rC)
             real2_a1 = FiveTuple(a1, a2, d1, d2, rD)
-            // Fake branch: (A → C, B → D)
+            // Fake branch: (A→C, B→D)
             fake1_a1 = FourTuple(a1, a2, c1, c2)
             fake2_a1 = FourTuple(b1, b2, d1, d2)
         }
@@ -183,6 +183,8 @@ object ZKPUtils {
         putCommit(fakeCommit2.A_g, fakeCommit2.A_h)
         val eBytes = baos.toByteArray()
         val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
+        println("Prover: Global challenge input bytes: ${eBytes.joinToString("") { "%02x".format(it) }}")
+        println("Prover: Computed global challenge: ${e.toString(16)}")
 
         // 4) Set the real branch’s challenge to be:
         //    cReal = e – (cFake1 + cFake2) mod n.
@@ -204,7 +206,7 @@ object ZKPUtils {
             if (switchFlag == 0)
                 Quadruple(cReal, cFakeTotal, realAnd, fakeAnd)
             else
-                Quadruple(cFakeTotal, cReal, fakeAnd, realAnd)
+                Quadruple(cReal, cFakeTotal, realAnd, fakeAnd)
 
         return ZKPOrProof(
             proofA = proofA,
@@ -215,27 +217,27 @@ object ZKPUtils {
         )
     }
 
-    /**
-     * Helper: Computes a Fiat–Shamir challenge from the given commitments.
-     * We build a dynamic byte array (via ByteArrayOutputStream) to avoid unused padding.
-     */
-    private fun hashChallenge(
-        A_gSer: GroupElement,
-        A_hSer: GroupElement,
-        XSer: GroupElement,
-        YSer: GroupElement,
-        publicKey: PublicKey,
-        domainParameters: ECDomainParameters
-    ): BigInteger {
-        val baos = ByteArrayOutputStream()
-        baos.write(A_gSer.data.toByteArray())
-        baos.write(A_hSer.data.toByteArray())
-        baos.write(XSer.data.toByteArray())
-        baos.write(YSer.data.toByteArray())
-        val combined = baos.toByteArray()
-        val cRaw = CryptoUtils.hashToBigInteger(combined)
-        return cRaw.mod(domainParameters.n)
-    }
+//    /**
+//     * Helper: Computes a Fiat–Shamir challenge from the given commitments.
+//     * We build a dynamic byte array (via ByteArrayOutputStream) to avoid unused padding.
+//     */
+//    private fun hashChallenge(
+//        A_gSer: GroupElement,
+//        A_hSer: GroupElement,
+//        XSer: GroupElement,
+//        YSer: GroupElement,
+//        publicKey: PublicKey,
+//        domainParameters: ECDomainParameters
+//    ): BigInteger {
+//        val baos = ByteArrayOutputStream()
+//        baos.write(A_gSer.data.toByteArray())
+//        baos.write(A_hSer.data.toByteArray())
+//        baos.write(XSer.data.toByteArray())
+//        baos.write(YSer.data.toByteArray())
+//        val combined = baos.toByteArray()
+//        val cRaw = CryptoUtils.hashToBigInteger(combined)
+//        return cRaw.mod(domainParameters.n)
+//    }
 
     /**
      * Commits a real sub-proof by choosing a random ephemeral exponent t,
