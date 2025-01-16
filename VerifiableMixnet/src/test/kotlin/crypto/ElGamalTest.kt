@@ -18,8 +18,8 @@ object ElGamalTest {
 
     private const val TEST_ITERATIONS = 1000
     private const val RERANDOMIZATION_COUNT = 20
-    private const val MIN_MESSAGE_LENGTH = 1 // Minimum number of characters
-    private const val MAX_MESSAGE_LENGTH = 31 // Maximum number of characters (adjust based on field size)
+    const val MIN_MESSAGE_LENGTH = 1 // Minimum number of characters
+    const val MAX_MESSAGE_LENGTH = 31 // Maximum number of characters (adjust based on field size)
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -106,7 +106,7 @@ object ElGamalTest {
      * @param random    SecureRandom instance for randomness.
      * @return A random ASCII string.
      */
-    private fun generateRandomAsciiString(minLength: Int, maxLength: Int, random: SecureRandom): String {
+    fun generateRandomAsciiString(minLength: Int, maxLength: Int, random: SecureRandom): String {
         val length = random.nextInt(maxLength - minLength + 1) + minLength
         val chars = ('!'..'~') // Printable ASCII characters excluding space
         return (1..length)

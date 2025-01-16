@@ -10,7 +10,7 @@ import java.nio.ByteBuffer
 import java.security.PublicKey
 import java.security.SecureRandom
 
-class ZKPUtils {
+object ZKPUtils {
 
     /**
      * Generates a real Schnorr Discrete-Log-Equality Proof.
@@ -36,7 +36,7 @@ class ZKPUtils {
      * @param r The randomness used in rerandomization.
      * @return An instance of SchnorrProofDL containing A_g, A_h, and z.
      */
-    private fun generateSingleZKP(
+    fun generateSingleZKP(
         a1: GroupElement,
         a2: GroupElement,
         c1: GroupElement,
@@ -148,6 +148,7 @@ class ZKPUtils {
         // This ensures standard verify will pass.
 
         while (true) {
+            println(a1Point)
             val cCandidate = BigIntegerUtils.randomBigInteger(n, rnd)
             val zCandidate = BigIntegerUtils.randomBigInteger(n, rnd)
 
@@ -417,3 +418,4 @@ class ZKPUtils {
     }
 
 }
+

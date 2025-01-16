@@ -6,6 +6,7 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.BigIntegerUtils
 import org.example.crypto.CryptoConfig
 import org.example.crypto.CryptoUtils
+import org.example.mixnet.ZKPUtils
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.util.function.Function
@@ -24,7 +25,8 @@ class Switch(
 
     private var b = 0
     var zkp: Mixing.Mix2Proof? = null
-        private set
+    var zkpOrProof: ZKPOrProof? = null
+
 
     /**
      * Sets the switching flag.
@@ -70,9 +72,9 @@ class Switch(
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
         // Generate ZKP to prove correct switching without revealing b
 //        this.zkp = generateZKP(votes, swapped, b)
+//        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
 
-        val firstAndProof: ZKPAndProof = generateZKP(votes, swapped, r1, r2)
-        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
+        this.zkpOrProof = generateZKP(votes, swapped, r1, r2, b)
 
         return rerandomizedVotes
     }
@@ -91,8 +93,9 @@ class Switch(
         votes: List<Vote>,
         swappedVotes: List<Vote>,
         r1: BigInteger,
-        r2: BigInteger
-    ): ZKPAndProof {
+        r2: BigInteger,
+        b: Int
+    ): ZKPOrProof {
         require(votes.size == 2) { "Expected exactly 2 original votes." }
         require(swappedVotes.size == 2) { "Expected exactly 2 swapped votes." }
 
@@ -103,16 +106,18 @@ class Switch(
         val cCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[0].getEncryptedMessage())
         val dCiphertext = CryptoUtils.unwrapCiphertext(swappedVotes[1].getEncryptedMessage())
 
-        // Generate Schnorr proofs for each rerandomized vote
-        val firstProof = generateSingleZKP(aCiphertext.c1, aCiphertext.c2, cCiphertext.c1, cCiphertext.c2, r1)
-        val secondProof = generateSingleZKP(bCiphertext.c1, bCiphertext.c2, dCiphertext.c1, dCiphertext.c2, r2)
-
-        return ZKPAndProof(firstProof, secondProof)
+        // Generate the OR-proof with the known random exponents
+        val orProof = ZKPUtils.generateOrProof(
+            aCiphertext.c1, aCiphertext.c2,
+            bCiphertext.c1, bCiphertext.c2,
+            cCiphertext.c1, cCiphertext.c2,
+            dCiphertext.c1, dCiphertext.c2,
+            r1, r2,
+            b,
+            publicKey,
+            domainParameters
+        )
+        return orProof
     }
-
-
-    // TODO: Add method to generate zero-knowledge proofs for correctness
-
-
 
 }
