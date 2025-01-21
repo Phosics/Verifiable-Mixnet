@@ -134,6 +134,7 @@ object ZKPUtils {
         val fake1_a1: FourTuple
         val fake2_a1: FourTuple
 
+        println("Prover: switchFlag = $switchFlag")
         if (switchFlag == 0) {
             // Real branch: (A→C, B→D)
             real1_a1 = FiveTuple(a1, a2, c1, c2, rC)
@@ -150,13 +151,11 @@ object ZKPUtils {
             fake2_a1 = FourTuple(b1, b2, d1, d2)
         }
 
-        // 1) Compute commitments for the real branch.
+        // 1) Compute commitments for the real branch. (first part of the proof)
         val realCommit1 = commitRealSubProof(
-            real1_a1.a1, real1_a1.a2, real1_a1.c1, real1_a1.c2, real1_a1.r,
             publicKey, domainParameters
         )
         val realCommit2 = commitRealSubProof(
-            real2_a1.a1, real2_a1.a2, real2_a1.c1, real2_a1.c2, real2_a1.r,
             publicKey, domainParameters
         )
 
@@ -184,12 +183,15 @@ object ZKPUtils {
         val eBytes = baos.toByteArray()
         val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
         println("Prover: Global challenge input bytes: ${eBytes.joinToString("") { "%02x".format(it) }}")
-        println("Prover: Computed global challenge: ${e.toString(16)}")
+        println("Prover: Computed global challenge: ${e.toString(16)}\n")
 
         // 4) Set the real branch’s challenge to be:
         //    cReal = e – (cFake1 + cFake2) mod n.
         val cFakeTotal = fakeCommit1.cFake.add(fakeCommit2.cFake).mod(domainParameters.n)
         val cReal = e.subtract(cFakeTotal).mod(domainParameters.n)
+
+        println("Prover: Real challenge: ${cReal.toString(16)}")
+        println("Prover: Fake total challenge: ${cFakeTotal.toString(16)}\n")
 
         // 5) Finalize the real branch by computing responses with the challenge cReal.
         val proofReal1 = finalizeRealSubProof(realCommit1, cReal, real1_a1.r, domainParameters)
@@ -244,11 +246,6 @@ object ZKPUtils {
      * and computing A_g = G^t and A_h = H^t.
      */
     private fun commitRealSubProof(
-        a1: GroupElement,
-        a2: GroupElement,
-        c1: GroupElement,
-        c2: GroupElement,
-        r: BigInteger,
         publicKey: PublicKey,
         domainParameters: ECDomainParameters
     ): SchnorrCommitReal {
