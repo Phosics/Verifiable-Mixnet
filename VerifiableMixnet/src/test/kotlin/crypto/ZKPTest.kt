@@ -75,7 +75,7 @@ class ZKPTest {
                 aCiphertext.c1, aCiphertext.c2,
                 bCiphertext.c1, bCiphertext.c2,
                 cCiphertext.c1, cCiphertext.c2,
-                dCiphertext.c1, dCiphertext.c2
+                dCiphertext.c1, dCiphertext.c2,
             )
             println("OR-Proof verification result: $ok")
         }

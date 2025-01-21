@@ -66,7 +66,17 @@ class Switch(
             val r = if (index == 0) r1 else r2
             vote.addRandomness(publicKey, domainParameters, r)
         }
+//
+//        val aCiphertext = CryptoUtils.unwrapCiphertext(votes[0].getEncryptedMessage())
+//        val bCiphertext = CryptoUtils.unwrapCiphertext(votes[1].getEncryptedMessage())
+//
+//        val cCiphertext = CryptoUtils.unwrapCiphertext(rerandomizedVotes[0].getEncryptedMessage())
+//        val dCiphertext = CryptoUtils.unwrapCiphertext(rerandomizedVotes[1].getEncryptedMessage())
 
+//        println("a1: ${CryptoUtils.deserializeGroupElement(aCiphertext.c1, domainParameters)}")
+//        println("b1: ${CryptoUtils.deserializeGroupElement(bCiphertext.c1, domainParameters)}")
+//        println("c1: ${CryptoUtils.deserializeGroupElement(cCiphertext.c1, domainParameters)}")
+//        println("d1: ${CryptoUtils.deserializeGroupElement(dCiphertext.c1, domainParameters)}")
 
 
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
@@ -74,7 +84,7 @@ class Switch(
 //        this.zkp = generateZKP(votes, swapped, b)
 //        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
 
-        this.zkpOrProof = generateZKP(votes, swapped, r1, r2, b)
+        this.zkpOrProof = generateZKP(votes, rerandomizedVotes, r1, r2, b)
 
         return rerandomizedVotes
     }
