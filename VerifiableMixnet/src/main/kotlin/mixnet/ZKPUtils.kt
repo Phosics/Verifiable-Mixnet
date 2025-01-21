@@ -25,6 +25,14 @@ object ZKPUtils {
      * Then, the branch challenges are set such that:
      *    e = cReal + cFake,
      * where cReal is used for the real branch and cFake for the simulated branch.
+     *
+     * The security of each Schnorr proof (and hence the overall OR‑proof) ultimately relies on the
+     * hardness of the discrete logarithm problem in the chosen group
+     *
+     * @param rC The secret witness for the upper output (c).
+     * @param rD The secret witness for the lower output (d).
+     * @param switchFlag The secret switch flag (0 or 1).
+     * @return A ZKPOrProof object containing the OR‑proof.
      */
     fun generateOrProof(
         a1: GroupElement, a2: GroupElement,
@@ -42,8 +50,8 @@ object ZKPUtils {
         // Organize parameters into helper tuples.
         val real1Params: FiveTuple
         val real2Params: FiveTuple
-        val fake1Params: FourTuple
-        val fake2Params: FourTuple
+        val fake1Params: FourTuple // without the random witness
+        val fake2Params: FourTuple // without the random witness
 
         println("Prover: switchFlag = $switchFlag\n")
         if (switchFlag == 0) {
@@ -62,7 +70,7 @@ object ZKPUtils {
             fake2Params = FourTuple(b1, b2, d1, d2)
         }
 
-        // 1) Compute real branch commitments.
+        // 1) Compute real branch commitments. (first part of the proof)
         val realCommit1 = commitRealSubProof(publicKey, domainParameters)
         val realCommit2 = commitRealSubProof(publicKey, domainParameters)
 
@@ -87,7 +95,7 @@ object ZKPUtils {
         }
 
         if (switchFlag == 0){
-            // The first proof is related to upper output
+            // The first proof is always related to: A-C, B-D
             putCommit(realCommit1.A_g, realCommit1.A_h)
             putCommit(realCommit2.A_g, realCommit2.A_h)
             putCommit(fakeCommit1.A_g, fakeCommit1.A_h)
@@ -128,7 +136,7 @@ object ZKPUtils {
         // fullChallenge = e.
         val (challengeA, challengeB, proofA, proofB) =
             if (switchFlag == 0)
-                // The first proof is related to upper output
+                // The first proof is always related to: A-C, B-D
                 Quadruple(cReal, cFake, realAnd, fakeAnd)
             else
                 Quadruple(cFake, cReal, fakeAnd, realAnd)
@@ -153,6 +161,9 @@ object ZKPUtils {
      *    A_h = h^(zFake) - Y * (fakeChallenge)
      *
      * The fake challenge is not chosen randomly here; it is provided by the caller.
+     *
+     * @param fakeChallenge The externally provided fake challenge.
+     * @return A SchnorrCommitFake object containing the fake commitments.
      */
     private fun simulateFakeSubProofWithGivenChallenge(
         a1: GroupElement,
@@ -166,11 +177,11 @@ object ZKPUtils {
         val rnd = SecureRandom.getInstanceStrong()
 
         // Deserialize input points.
-        val a1Point = CryptoUtils.deserializeGroupElement(a1, domainParameters)
-        val a2Point = CryptoUtils.deserializeGroupElement(a2, domainParameters)
-        val c1Point = CryptoUtils.deserializeGroupElement(c1, domainParameters)
-        val c2Point = CryptoUtils.deserializeGroupElement(c2, domainParameters)
-        val hPoint  = CryptoUtils.extractECPointFromPublicKey(publicKey)
+        val (a1Point, a2Point, c1Point, c2Point) = listOf(a1, a2, c1, c2).map {
+            CryptoUtils.deserializeGroupElement(it, domainParameters)
+        }
+        val hPoint = CryptoUtils.extractECPointFromPublicKey(publicKey)
+
         // Compute X and Y (the statement elements).
         val XPoint = c1Point.add(a1Point.negate()).normalize()
         val YPoint = c2Point.add(a2Point.negate()).normalize()
@@ -203,7 +214,7 @@ object ZKPUtils {
     }
 
     /**
-     * Computes a real commitment for a sub‑proof:
+     * Computes a real commitment for a sub‑proof (fist part of the proof):
      *    A_g = g^t  and  A_h = h^t,
      * where t is chosen randomly.
      */
@@ -226,6 +237,11 @@ object ZKPUtils {
      * Finalizes a real sub‑proof by computing the response:
      *    z = t + (challengeReal * r) mod n,
      * where r is the secret witness.
+     *
+     * @param commit The first part of the real commitment.
+     * @param challengeReal The real branch challenge.
+     * @param r The secret random witness.
+     * @return A SchnorrProofDL object containing the final proof.
      */
     private fun finalizeRealSubProof(
         commit: SchnorrCommitReal,
@@ -252,6 +268,11 @@ private data class Quadruple<A, B, C, D>(
     val fourth: D    // AND-proof for branch B
 )
 
+/**
+ * Data class representing a tuple of five elements, for the real proof.
+ *
+ * @property r The BigInteger value.
+ */
 private data class FiveTuple(
     val a1: GroupElement,
     val a2: GroupElement,
@@ -260,6 +281,10 @@ private data class FiveTuple(
     val r: BigInteger
 )
 
+/**
+ * Data class representing a tuple of four elements, for the fake proof.
+ *
+ */
 private data class FourTuple(
     val a1: GroupElement,
     val a2: GroupElement,

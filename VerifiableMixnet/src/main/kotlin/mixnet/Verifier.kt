@@ -19,6 +19,11 @@ class Verifier(
     private val publicKey: PublicKey
 ) {
 
+    /**
+     * Verifies the OR-proof for the 2×2 "Switch" scenario.
+     *
+     * @param orProof The OR-proof to verify.
+     */
     fun verifyOrProof(
         orProof: ZKPOrProof,
         // Original ciphertexts (for the inputs)
@@ -73,6 +78,8 @@ class Verifier(
     /**
      * Computes the global challenge exactly as the prover does by concatenating the serialized commitments
      * from both AND-proof branches.
+     *
+     * @param orProof The OR-proof containing the AND-proofs to combine.
      */
     private fun computeGlobalChallengeCombined(orProof: ZKPOrProof): BigInteger {
         val baos = ByteArrayOutputStream()
@@ -93,6 +100,9 @@ class Verifier(
 
     /**
      * Verifies an AND‑proof branch using the provided branch challenge.
+     *
+     * @param andProof The AND‑proof to verify.
+     * @param providedChallenge The branch challenge to use for verification.
      */
     private fun verifyAndProofWithProvidedChallenge(
         andProof: ZKPAndProof,
@@ -117,6 +127,9 @@ class Verifier(
 
     /**
      * Verifies a single Schnorr sub‑proof using the provided challenge.
+     *
+     * @param proof The Schnorr proof to verify.
+     * @param providedChallenge The challenge to use for verification.
      */
     private fun verifySingleZKPProvidedChallenge(
         proof: SchnorrProofDL,

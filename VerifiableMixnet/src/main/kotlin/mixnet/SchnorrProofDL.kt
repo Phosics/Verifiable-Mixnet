@@ -26,13 +26,15 @@ data class ZKPAndProof(
     val proof2: SchnorrProofDL
 )
 
-data class SimulatedProofDL(
-    val A_g: GroupElement,
-    val A_h: GroupElement,
-    val z: BigInteger,
-    val cSim: BigInteger
-)
-
+/**
+ * Data class representing a Zero-Knowledge Proof (ZKP) for an OR-proof.
+ *
+ * @property proofA The "A" side of the OR-proof, consisting of two subproofs in AND.
+ * @property proofB The "B" side of the OR-proof, consisting of two subproofs in AND.
+ * @property challengeA The challenge for the "A" side (eA).
+ * @property challengeB The challenge for the "B" side (eB).
+ * @property fullChallenge The full challenge, which is the sum of challengeA and challengeB.
+ */
 data class ZKPOrProof(
     val proofA: ZKPAndProof,     // The "A" side (two subproofs in AND)
     val proofB: ZKPAndProof,     // The "B" side

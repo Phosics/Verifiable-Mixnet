@@ -26,6 +26,7 @@ class Switch(
     private var b = 0
     var zkp: Mixing.Mix2Proof? = null
     var zkpOrProof: ZKPOrProof? = null
+    // TODO: serialize the zkpOrProof into a protobuf message
 
 
     /**
@@ -66,21 +67,7 @@ class Switch(
             val r = if (index == 0) r1 else r2
             vote.addRandomness(publicKey, domainParameters, r)
         }
-//
-//        val aCiphertext = CryptoUtils.unwrapCiphertext(votes[0].getEncryptedMessage())
-//        val bCiphertext = CryptoUtils.unwrapCiphertext(votes[1].getEncryptedMessage())
-//
-//        val cCiphertext = CryptoUtils.unwrapCiphertext(rerandomizedVotes[0].getEncryptedMessage())
-//        val dCiphertext = CryptoUtils.unwrapCiphertext(rerandomizedVotes[1].getEncryptedMessage())
 
-//        println("a1: ${CryptoUtils.deserializeGroupElement(aCiphertext.c1, domainParameters)}")
-//        println("b1: ${CryptoUtils.deserializeGroupElement(bCiphertext.c1, domainParameters)}")
-//        println("c1: ${CryptoUtils.deserializeGroupElement(cCiphertext.c1, domainParameters)}")
-//        println("d1: ${CryptoUtils.deserializeGroupElement(dCiphertext.c1, domainParameters)}")
-
-
-        // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
-        // Generate ZKP to prove correct switching without revealing b
         val defaultProof:  Mixing.Mix2Proof = Mixing.Mix2Proof.newBuilder()
             .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
             .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
@@ -91,14 +78,15 @@ class Switch(
                 .setOut1(1)         // Example value; set appropriately
                 .build())
             .build()
-
-
         this.zkp = defaultProof
+        // TODO: delete the default proof and serialize the actual proof
 
+        // Generate ZKP to prove correct switching without revealing b
         this.zkpOrProof = generateZKP(votes, rerandomizedVotes, r1, r2, b)
 
         return rerandomizedVotes
     }
+
     /**
      * Generates Zero-Knowledge Proofs (ZKPs) for rerandomized votes in a mixnet.
      *
