@@ -94,7 +94,6 @@ class Switch(
 
 
         this.zkp = defaultProof
-//        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
 
         this.zkpOrProof = generateZKP(votes, rerandomizedVotes, r1, r2, b)
 

@@ -58,8 +58,8 @@ class Verifier(
             a1, a2, d1, d2
         )
 
-        println("Verifier: Branch A verifies: $okBranchA")
-        println("Verifier: Branch B verifies: $okBranchB\n")
+//        println("Verifier: Branch A verifies: $okBranchA")
+//        println("Verifier: Branch B verifies: $okBranchB\n")
 
         val result = okBranchA && okBranchB
         if (!result) {
@@ -85,9 +85,9 @@ class Verifier(
         putAndProof(orProof.proofA)
         putAndProof(orProof.proofB)
         val eBytes = baos.toByteArray()
-        println("Verifier: Global challenge input bytes: ${eBytes.joinToString("") { "%02x".format(it) }}")
+//        println("Verifier: Global challenge input bytes: ${eBytes.joinToString("") { "%02x".format(it) }}")
         val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
-        println("Verifier: Combined global challenge: ${e.toString(16)}\n")
+//        println("Verifier: Combined global challenge: ${e.toString(16)}\n")
         return e
     }
 
@@ -143,21 +143,21 @@ class Verifier(
         val rhsG = A_gPoint.add(XPoint.multiply(providedChallenge)).normalize()
         val rhsH = A_hPoint.add(YPoint.multiply(providedChallenge)).normalize()
 
-        println("A_gPoint: ${A_gPoint}")
-        println("g: ${domainParameters.g}")
-        println("z: ${proof.z}")
-        println("providedChallenge: ${providedChallenge}")
-        println("XPoint: ${XPoint}")
-        println("c1Point: ${c1Point}")
-        println("a1Point: ${a1Point}\n")
-
-
-        println("Verifier (using provided branch challenge):")
-        println("Provided branch challenge: ${providedChallenge.toString(16)}")
-        println("LHS (z*G): ${CryptoUtils.serializeGroupElement(lhsG).data.joinToString("") { "%02x".format(it) }}")
-        println("RHS (A_g + challenge*X): ${CryptoUtils.serializeGroupElement(rhsG).data.joinToString("") { "%02x".format(it) }}")
-        println("LHS (z*H): ${CryptoUtils.serializeGroupElement(lhsH).data.joinToString("") { "%02x".format(it) }}")
-        println("RHS (A_h + challenge*Y): ${CryptoUtils.serializeGroupElement(rhsH).data.joinToString("") { "%02x".format(it) }}\n")
+//        println("A_gPoint: ${A_gPoint}")
+//        println("g: ${domainParameters.g}")
+//        println("z: ${proof.z}")
+//        println("providedChallenge: ${providedChallenge}")
+//        println("XPoint: ${XPoint}")
+//        println("c1Point: ${c1Point}")
+//        println("a1Point: ${a1Point}\n")
+//
+//
+//        println("Verifier (using provided branch challenge):")
+//        println("Provided branch challenge: ${providedChallenge.toString(16)}")
+//        println("LHS (z*G): ${CryptoUtils.serializeGroupElement(lhsG).data.joinToString("") { "%02x".format(it) }}")
+//        println("RHS (A_g + challenge*X): ${CryptoUtils.serializeGroupElement(rhsG).data.joinToString("") { "%02x".format(it) }}")
+//        println("LHS (z*H): ${CryptoUtils.serializeGroupElement(lhsH).data.joinToString("") { "%02x".format(it) }}")
+//        println("RHS (A_h + challenge*Y): ${CryptoUtils.serializeGroupElement(rhsH).data.joinToString("") { "%02x".format(it) }}\n")
 
         return (lhsG == rhsG) && (lhsH == rhsH)
     }
