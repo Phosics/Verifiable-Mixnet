@@ -81,7 +81,19 @@ class Switch(
 
         // TODO: Implement Zero-Knowledge Proof (ZKP) here to prove correct switching without revealing b
         // Generate ZKP to prove correct switching without revealing b
-//        this.zkp = generateZKP(votes, swapped, b)
+        val defaultProof:  Mixing.Mix2Proof = Mixing.Mix2Proof.newBuilder()
+            .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
+            .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
+            .setLocation(Mixing.Mix2Proof.Location.newBuilder()
+                .setLayer(0)        // Example value; set appropriately
+                .setSwitchIdx(0)    // Example value; set appropriately
+                .setOut0(0)         // Example value; set appropriately
+                .setOut1(1)         // Example value; set appropriately
+                .build())
+            .build()
+
+
+        this.zkp = defaultProof
 //        val secondAndProof: ZKPAndProof = generateZKP(votes, swapped, r2, r1) // C is always randomized with r1
 
         this.zkpOrProof = generateZKP(votes, rerandomizedVotes, r1, r2, b)
