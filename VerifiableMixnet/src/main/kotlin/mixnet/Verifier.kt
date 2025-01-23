@@ -1,7 +1,9 @@
 package org.example.mixnet
 
 import meerkat.protobuf.ConcreteCrypto.GroupElement
+import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
+import mixnet.PermutationNetwork
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.CryptoUtils
 import java.io.ByteArrayOutputStream
@@ -218,26 +220,66 @@ class Verifier(
      */
     fun verifyMixBatchOutput(mixBatchOutput: MixBatchOutput): Boolean {
 
+        val numProofCols = mixBatchOutput.proofsMatrix[0].size
+
+        val mid = numProofCols / 2
+
         println("num of rows: ${mixBatchOutput.proofsMatrix.size}")
         println("num of cols: ${mixBatchOutput.proofsMatrix[0].size}")
 
         println("num of rows cipher: ${mixBatchOutput.ciphertextsMatrix.size}")
         println("num of cols cipher: ${mixBatchOutput.ciphertextsMatrix[0].size}")
 
-        for (rowIdx in mixBatchOutput.proofsMatrix.indices) {
-            for (colIdx in mixBatchOutput.proofsMatrix[rowIdx].indices) {
+        for (colIdx in mixBatchOutput.proofsMatrix[0].indices) {
+
+            var firstCol: List<Crypto. RerandomizableEncryptedMessage>
+            var lastCol: List<Crypto. RerandomizableEncryptedMessage>
+
+            if (colIdx <= numProofCols / 2 - 1) {
+
+                println("if1 = $colIdx")
+
+                firstCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
+
+                // Extract Votes from the target column
+                val temp = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
+
+                // Apply the permutation mapping
+                lastCol = applyLastColMap(temp)
+
+            } else if (colIdx >= (numProofCols + 1) / 2) {
+
+                println("if2 = $colIdx")
+
+                val temp = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
+
+                firstCol = applyFirstColMap(temp)
+
+                lastCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
+
+            } else {
+
+                println("else = $colIdx")
+
+                firstCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
+
+                lastCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
+            }
+
+
+            for (rowIdx in mixBatchOutput.proofsMatrix.indices) {
                 val proof = mixBatchOutput.proofsMatrix[rowIdx][colIdx]
 
-                println("a index: ${rowIdx * 2}, $colIdx")
-                println("b index: ${rowIdx * 2 + 1}, $colIdx")
-                println("c index: ${rowIdx * 2}, ${colIdx + 1}")
-                println("d index: ${rowIdx * 2 + 1}, ${colIdx + 1}")
+//                println("a index: ${rowIdx * 2}, $colIdx")
+//                println("b index: ${rowIdx * 2 + 1}, $colIdx")
+//                println("c index: ${rowIdx * 2}, ${colIdx + 1}")
+//                println("d index: ${rowIdx * 2 + 1}, ${colIdx + 1}")
 
                 // Extract the original and final ciphertexts for verification
-                val aCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2][colIdx])
-                val bCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2 + 1][colIdx])
-                val cCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2][colIdx + 1])
-                val dCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2 + 1][colIdx + 1])
+                val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
+                val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
+                val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
+                val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
 
                 // Verify the proof
                 if (!verifyOrProof(proof, aCiphertext.c1, aCiphertext.c2, bCiphertext.c1, bCiphertext.c2, cCiphertext.c1, cCiphertext.c2, dCiphertext.c1, dCiphertext.c2)) {
@@ -246,6 +288,41 @@ class Verifier(
             }
         }
         return true
+    }
+
+    /**
+     * Maps the first column's result to prepare inputs for sub-networks.
+     */
+    private fun applyFirstColMap(votes:
+                                 List<Crypto. RerandomizableEncryptedMessage>):
+            List<Crypto. RerandomizableEncryptedMessage> {
+        val size = votes.size
+        val half = size / 2
+        val result = MutableList(size) { votes[it] }  // copy
+
+        for (i in 0 until half) {
+            result[i] = votes[2 * i]
+            result[i + half] = votes[2 * i + 1]
+        }
+        return result.toList()
+    }
+
+    /**
+     * Maps the last column's result to finalize the permutation.
+     */
+    private fun applyLastColMap(votes:
+                                List<Crypto. RerandomizableEncryptedMessage>):
+            List<Crypto. RerandomizableEncryptedMessage> {
+        // Reverse of applyFirstColMap
+        val size = votes.size
+        val half = size / 2
+        val result = MutableList(size) { votes[it] }
+
+        for (i in 0 until half) {
+            result[2 * i] = votes[i]
+            result[2 * i + 1] = votes[i + half]
+        }
+        return result.toList()
     }
 
 }

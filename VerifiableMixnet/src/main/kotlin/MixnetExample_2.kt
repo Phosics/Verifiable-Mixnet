@@ -33,6 +33,19 @@ fun main() {
         "VoteTwo",
         "VoteThree",
         "VoteFour",
+        "VoteFive",
+        "VoteSix",
+        "VoteSeven",
+        "VoteEight",
+        "VoteOne",
+        "VoteTwo",
+        "VoteThree",
+        "VoteFour",
+        "VoteFive",
+        "VoteSix",
+        "VoteSeven",
+        "VoteEight",
+
 
     )
 
@@ -81,7 +94,6 @@ fun main() {
 
     mixBatchOutputs.forEachIndexed { index, mixBatchOutput ->
         println("MixBatchOutput verifier for Server ${index + 1}:")
-//        println(mixBatchOutput.verifyMixBatch()) TODO: add again for text
         println(Verifier(domainParameters, publicKey).verifyMixBatchOutput(mixBatchOutput))
         println("--------------------------------------------------")
     }
