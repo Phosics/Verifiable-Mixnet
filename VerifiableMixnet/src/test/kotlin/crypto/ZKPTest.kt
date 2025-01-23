@@ -66,7 +66,7 @@ class ZKPTest {
 
             // Verify the OR-proof.
             val ok = Verifier(domainParameters, publicKey).verifyOrProof(
-                orProof,
+                ZKPUtils.serializeZKP(orProof),
                 aCiphertext.c1, aCiphertext.c2,
                 bCiphertext.c1, bCiphertext.c2,
                 cCiphertext.c1, cCiphertext.c2,

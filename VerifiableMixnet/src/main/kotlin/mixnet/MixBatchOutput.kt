@@ -73,39 +73,7 @@ data class MixBatchOutput(
         return sb.toString()
     }
 
-    /**
-     * Verifies the Zero-Knowledge Proofs (ZKPs) within a MixBatchOutput.
-     * Returns true if all proofs are valid.
-     *
-     * @param mixBatchOutput The MixBatchOutput containing proofs to verify.
-     * @return True if all proofs are valid, False otherwise.
-     */
-    fun verifyMixBatch(): Boolean {
-        // TODO: It is not a proper location for this function
 
-        // Iterate through each layer's proofs
-        for (layerProofs in proofsMatrix) {
-            for (proof in layerProofs) {
-                if (!validateProof(proof)) {
-                    return false
-                }
-            }
-        }
-        return true
-    }
-
-    /**
-     * Validates a single Mix2Proof.
-     *
-     * @param proof The Mix2Proof to validate.
-     * @return True if the proof is valid, False otherwise.
-     */
-    private fun validateProof(proof: Mixing.Mix2Proof): Boolean {
-        // TODO: Implement actual proof validation logic
-        // For now, return true if the proof is the default instance
-//        println("proof: $proof\t default: ${Mixing.Mix2Proof.getDefaultInstance()}")
-        return proof == defaultProof
-    }
 
     /**
      * Extension function to convert ByteArray to hex string.

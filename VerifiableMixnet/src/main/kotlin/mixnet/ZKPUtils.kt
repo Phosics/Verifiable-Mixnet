@@ -1,6 +1,8 @@
 package org.example.mixnet
 
+import com.google.protobuf.ByteString
 import meerkat.protobuf.ConcreteCrypto.GroupElement
+import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.BigIntegerUtils
 import org.example.crypto.CryptoUtils
@@ -53,7 +55,7 @@ object ZKPUtils {
         val fake1Params: FourTuple // without the random witness
         val fake2Params: FourTuple // without the random witness
 
-        println("Prover: switchFlag = $switchFlag\n")
+//        println("Prover: switchFlag = $switchFlag\n")
         if (switchFlag == 0) {
             // Real branch: (A → C, B → D)
             real1Params = FiveTuple(a1, a2, c1, c2, rC)
@@ -256,6 +258,90 @@ object ZKPUtils {
             z = z
         )
     }
+
+
+    /**
+     * Serializes the ZKPOrProof into a Mixing.Mix2Proof object.
+     *
+     * @param orProof The ZKPOrProof to serialize.
+     * @return A Mixing.Mix2Proof object.
+     */
+    fun serializeZKP(orProof: ZKPOrProof): Mixing.Mix2Proof {
+        return Mixing.Mix2Proof.newBuilder()
+            .setFirstMessage(
+                Mixing.Mix2Proof.FirstMessage.newBuilder()
+                .setClause0(
+                    Mixing.Mix2Proof.AndProof.FirstMessage.newBuilder()
+                    .setClause0(
+                        Mixing.Mix2Proof.DlogProof.FirstMessage.newBuilder()
+                        .setGr(orProof.proofA.proof1.A_g)
+                        .setHr(orProof.proofA.proof1.A_h)
+                        .build())
+                    .setClause1(
+                        Mixing.Mix2Proof.DlogProof.FirstMessage.newBuilder()
+                        .setGr(orProof.proofA.proof2.A_g)
+                        .setHr(orProof.proofA.proof2.A_h)
+                        .build())
+                    .build())
+                .setClause1(
+                    Mixing.Mix2Proof.AndProof.FirstMessage.newBuilder()
+                    .setClause0(
+                        Mixing.Mix2Proof.DlogProof.FirstMessage.newBuilder()
+                        .setGr(orProof.proofB.proof1.A_g)
+                        .setHr(orProof.proofB.proof1.A_h)
+                        .build())
+                    .setClause1(
+                        Mixing.Mix2Proof.DlogProof.FirstMessage.newBuilder()
+                        .setGr(orProof.proofB.proof2.A_g)
+                        .setHr(orProof.proofB.proof2.A_h)
+                        .build())
+                    .build())
+                .build())
+            .setFinalMessage(
+                Mixing.Mix2Proof.FinalMessage.newBuilder()
+                .setClause0(
+                    Mixing.Mix2Proof.AndProof.FinalMessage.newBuilder()
+                    .setClause0(
+                        Mixing.Mix2Proof.DlogProof.FinalMessage.newBuilder()
+                        .setXcr(toProtoBigInteger(orProof.proofA.proof1.z))
+                        .build())
+                    .setClause1(
+                        Mixing.Mix2Proof.DlogProof.FinalMessage.newBuilder()
+                        .setXcr(toProtoBigInteger(orProof.proofA.proof2.z))
+                        .build())
+                    .build())
+                .setClause1(
+                    Mixing.Mix2Proof.AndProof.FinalMessage.newBuilder()
+                    .setClause0(
+                        Mixing.Mix2Proof.DlogProof.FinalMessage.newBuilder()
+                        .setXcr(toProtoBigInteger(orProof.proofB.proof1.z))
+                        .build())
+                    .setClause1(
+                        Mixing.Mix2Proof.DlogProof.FinalMessage.newBuilder()
+                        .setXcr(toProtoBigInteger(orProof.proofB.proof2.z))
+                        .build())
+                    .build())
+                .setC0(toProtoBigInteger(orProof.challengeA))
+                .build())
+            .setLocation(
+                Mixing.Mix2Proof.Location.newBuilder()
+                .setLayer(0)        // Example value; set appropriately
+                .setSwitchIdx(0)    // Example value; set appropriately
+                .setOut0(0)         // Example value; set appropriately
+                .setOut1(1)         // Example value; set appropriately
+                .build())
+            .build()
+    }
+
+    /**
+     * Helper function to convert BigInteger to Protobuf BigInteger.
+     */
+    private fun toProtoBigInteger(value: BigInteger): meerkat.protobuf.Crypto.BigInteger {
+        return meerkat.protobuf.Crypto.BigInteger.newBuilder()
+            .setData(ByteString.copyFrom(value.toByteArray()))
+            .build()
+    }
+
 }
 
 /*

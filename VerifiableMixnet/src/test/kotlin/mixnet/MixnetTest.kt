@@ -2,11 +2,14 @@ package mixnet
 
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
+import org.bouncycastle.asn1.x9.DomainParameters
+import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
 import org.example.mixnet.Vote
 import org.example.mixnet.MixBatchOutput
+import org.example.mixnet.Verifier
 import java.security.KeyPair
 import java.security.PublicKey
 import java.security.Security
@@ -91,7 +94,7 @@ object MixnetTest {
             println("MixBatchOutput for Server ${index + 1}:")
             println(mixBatchOutput.header)
 //            println(mixBatchOutput)
-            validateMixBatchOutput(mixBatchOutput, totalVotes)
+            validateMixBatchOutput(mixBatchOutput, totalVotes, domainParameters, publicKey)
             println("--------------------------------------------------")
         }
 
@@ -201,7 +204,7 @@ object MixnetTest {
      * @param mixBatchOutput The MixBatchOutput to validate.
      * @param expectedCount The expected number of ciphertexts per layer.
      */
-    fun validateMixBatchOutput(mixBatchOutput: MixBatchOutput, expectedCount: Int): Boolean {
+    fun validateMixBatchOutput(mixBatchOutput: MixBatchOutput, expectedCount: Int, domainParameters: ECDomainParameters, publicKey: PublicKey): Boolean {
         // 1) Validate CiphertextsMatrix by "rows"
         println("=== Validating CiphertextsMatrix by row (summarized) ===")
 
@@ -257,7 +260,7 @@ object MixnetTest {
 
         // 3) Verify the proofs’ signatures (or correctness) using your existing method
         println("\n=== Verifying proof signatures ===")
-        val proofsValid = mixBatchOutput.verifyMixBatch()
+        val proofsValid = Verifier(domainParameters, publicKey).verifyMixBatchOutput(mixBatchOutput)
         if (proofsValid) {
             println("✅ All proofs pass signature verification.")
         } else {

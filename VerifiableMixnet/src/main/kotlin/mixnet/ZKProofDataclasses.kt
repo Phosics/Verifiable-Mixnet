@@ -2,12 +2,6 @@ package org.example.mixnet
 
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import java.math.BigInteger
-import java.nio.ByteBuffer
-import java.security.PublicKey
-import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.CryptoUtils
-import org.example.crypto.BigIntegerUtils
-import java.security.SecureRandom
 
 /**
  * Represents a Schnorr Discrete-Log-Equality Proof for a single pair.
@@ -39,7 +33,7 @@ data class ZKPOrProof(
     val proofA: ZKPAndProof,     // The "A" side (two subproofs in AND)
     val proofB: ZKPAndProof,     // The "B" side
     val challengeA: BigInteger,  // eA
-    val challengeB: BigInteger,  // eB
+    var challengeB: BigInteger,  // eB
     val fullChallenge: BigInteger
 )
 

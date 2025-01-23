@@ -1,5 +1,6 @@
 package org.example.mixnet
 
+import com.google.protobuf.ByteString
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
@@ -68,21 +69,12 @@ class Switch(
             vote.addRandomness(publicKey, domainParameters, r)
         }
 
-        val defaultProof:  Mixing.Mix2Proof = Mixing.Mix2Proof.newBuilder()
-            .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
-            .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
-            .setLocation(Mixing.Mix2Proof.Location.newBuilder()
-                .setLayer(0)        // Example value; set appropriately
-                .setSwitchIdx(0)    // Example value; set appropriately
-                .setOut0(0)         // Example value; set appropriately
-                .setOut1(1)         // Example value; set appropriately
-                .build())
-            .build()
-        this.zkp = defaultProof
-        // TODO: delete the default proof and serialize the actual proof
-
         // Generate ZKP to prove correct switching without revealing b
         this.zkpOrProof = generateZKP(votes, rerandomizedVotes, r1, r2, b)
+
+        this.zkp = ZKPUtils.serializeZKP(this.zkpOrProof!!)
+
+        // TODO: deal with the location of the ZKP
 
         return rerandomizedVotes
     }

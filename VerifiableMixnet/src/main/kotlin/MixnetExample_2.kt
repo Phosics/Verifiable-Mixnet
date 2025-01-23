@@ -19,15 +19,13 @@ fun main() {
 
     // Define the number of adversaries and votes
     val t = 1 // Number of adversaries
-    val n = 8 // Number of votes (must be 2t +1 and a power of 2)
+//    val n = 2 // Number of votes (must be 2t +1 and a power of 2)
 
     // Generate EC-ElGamal key pair
     val keyPair: KeyPair = CryptoConfig.generateKeyPair()
     val publicKey: PublicKey = CryptoConfig.getPublicKey(keyPair)
     val domainParameters: ECDomainParameters = CryptoConfig.ecDomainParameters
 
-    // Initialize MixServersManager
-    val mixServersManager = MixServersManager(publicKey, domainParameters, t, n)
 
     // Define dummy messages for testing
     val dummyMessages = listOf(
@@ -35,11 +33,13 @@ fun main() {
         "VoteTwo",
         "VoteThree",
         "VoteFour",
-        "VoteFive",
-        "VoteSix",
-        "VoteSeven",
-        "VoteEight"
+
     )
+
+    val n = dummyMessages.size
+
+    // Initialize MixServersManager
+    val mixServersManager = MixServersManager(publicKey, domainParameters, t, n)
 
     // Encrypt the dummy messages to create Vote instances
     val votes: MutableList<Vote> = dummyMessages.mapIndexed { index, message ->

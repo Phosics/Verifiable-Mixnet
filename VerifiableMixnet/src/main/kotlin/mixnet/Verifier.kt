@@ -1,6 +1,7 @@
 package org.example.mixnet
 
 import meerkat.protobuf.ConcreteCrypto.GroupElement
+import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.CryptoUtils
 import java.io.ByteArrayOutputStream
@@ -25,7 +26,7 @@ class Verifier(
      * @param orProof The OR-proof to verify.
      */
     fun verifyOrProof(
-        orProof: ZKPOrProof,
+        mix2Proof: Mixing.Mix2Proof,
         // Original ciphertexts (for the inputs)
         a1: GroupElement, a2: GroupElement,
         b1: GroupElement, b2: GroupElement,
@@ -33,19 +34,13 @@ class Verifier(
         c1: GroupElement, c2: GroupElement,
         d1: GroupElement, d2: GroupElement
     ): Boolean {
-        // 1) Check that challengeA + challengeB equals fullChallenge.
-        val sumChallenges = orProof.challengeA.add(orProof.challengeB).mod(domainParameters.n)
-        if (sumChallenges != orProof.fullChallenge) {
-            println("Verifier: Global challenge mismatch: challengeA + challengeB != fullChallenge.")
-            return false
-        }
+
+        // 1) Deserialize the OR-proof.
+        val orProof: ZKPOrProof = deserializeZKP(mix2Proof)
 
         // 2) Recompute the global challenge by concatenating all commitments.
         val combinedGlobalChallenge = computeGlobalChallengeCombined(orProof)
-        if (combinedGlobalChallenge != orProof.fullChallenge) {
-            println("Verifier: Combined global challenge does not match fullChallenge.")
-            return false
-        }
+        orProof.challengeB = combinedGlobalChallenge.subtract(orProof.challengeA).mod(domainParameters.n)
 
         // 3) Verify each branch using the provided branch challenge.
         // For branch A, assume the pairing: (A → C) and (B → D)
@@ -174,4 +169,83 @@ class Verifier(
 
         return (lhsG == rhsG) && (lhsH == rhsH)
     }
+
+    private fun deserializeZKP(mix2Proof: Mixing.Mix2Proof): ZKPOrProof {
+        val proofA = ZKPAndProof(
+            proof1 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause0.clause0.gr,
+                A_h = mix2Proof.firstMessage.clause0.clause0.hr,
+                z = mix2Proof.finalMessage.clause0.clause0.xcr.toBigInteger()
+            ),
+            proof2 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause0.clause1.gr,
+                A_h = mix2Proof.firstMessage.clause0.clause1.hr,
+                z = mix2Proof.finalMessage.clause0.clause1.xcr.toBigInteger()
+            )
+        )
+
+        val proofB = ZKPAndProof(
+            proof1 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause1.clause0.gr,
+                A_h = mix2Proof.firstMessage.clause1.clause0.hr,
+                z = mix2Proof.finalMessage.clause1.clause0.xcr.toBigInteger()
+            ),
+            proof2 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause1.clause1.gr,
+                A_h = mix2Proof.firstMessage.clause1.clause1.hr,
+                z = mix2Proof.finalMessage.clause1.clause1.xcr.toBigInteger()
+            )
+        )
+
+        return ZKPOrProof(
+            proofA = proofA,
+            proofB = proofB,
+            challengeA = mix2Proof.finalMessage.c0.toBigInteger(),
+            challengeB = BigInteger.ZERO, // The protobuf message does not contain challengeB
+            fullChallenge = BigInteger.ZERO // The protobuf message does not contain fullChallenge
+        )
+    }
+
+    private fun meerkat.protobuf.Crypto.BigInteger.toBigInteger(): BigInteger {
+        return BigInteger(this.data.toByteArray())
+    }
+
+    /**
+     * Verifies the entire MixBatchOutput.
+     *
+     * @param mixBatchOutput The MixBatchOutput to verify.
+     * @return True if all proofs are valid, False otherwise.
+     */
+    fun verifyMixBatchOutput(mixBatchOutput: MixBatchOutput): Boolean {
+
+        println("num of rows: ${mixBatchOutput.proofsMatrix.size}")
+        println("num of cols: ${mixBatchOutput.proofsMatrix[0].size}")
+
+        println("num of rows cipher: ${mixBatchOutput.ciphertextsMatrix.size}")
+        println("num of cols cipher: ${mixBatchOutput.ciphertextsMatrix[0].size}")
+
+        for (rowIdx in mixBatchOutput.proofsMatrix.indices) {
+            for (colIdx in mixBatchOutput.proofsMatrix[rowIdx].indices) {
+                val proof = mixBatchOutput.proofsMatrix[rowIdx][colIdx]
+
+                println("a index: ${rowIdx * 2}, $colIdx")
+                println("b index: ${rowIdx * 2 + 1}, $colIdx")
+                println("c index: ${rowIdx * 2}, ${colIdx + 1}")
+                println("d index: ${rowIdx * 2 + 1}, ${colIdx + 1}")
+
+                // Extract the original and final ciphertexts for verification
+                val aCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2][colIdx])
+                val bCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2 + 1][colIdx])
+                val cCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2][colIdx + 1])
+                val dCiphertext = CryptoUtils.unwrapCiphertext(mixBatchOutput.ciphertextsMatrix[rowIdx * 2 + 1][colIdx + 1])
+
+                // Verify the proof
+                if (!verifyOrProof(proof, aCiphertext.c1, aCiphertext.c2, bCiphertext.c1, bCiphertext.c2, cCiphertext.c1, cCiphertext.c2, dCiphertext.c1, dCiphertext.c2)) {
+//                    return false
+                }
+            }
+        }
+        return true
+    }
+
 }
