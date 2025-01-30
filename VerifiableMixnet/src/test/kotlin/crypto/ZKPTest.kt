@@ -65,7 +65,7 @@ class ZKPTest {
             val dCiphertext = CryptoUtils.unwrapCiphertext(newVotes[1].getEncryptedMessage())
 
             // Verify the OR-proof.
-            val ok = Verifier(domainParameters, publicKey).verifyOrProof(
+            val ok = Verifier(domainParameters, publicKey).verifySingleOrProof(
                 ZKPUtils.serializeZKP(orProof),
                 aCiphertext.c1, aCiphertext.c2,
                 bCiphertext.c1, bCiphertext.c2,

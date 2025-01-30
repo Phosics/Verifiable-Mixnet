@@ -3,7 +3,6 @@ package org.example.mixnet
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
-import mixnet.PermutationNetwork
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.example.crypto.CryptoUtils
 import java.io.ByteArrayOutputStream
@@ -11,9 +10,10 @@ import java.math.BigInteger
 import java.security.PublicKey
 
 /**
- * A Verifier for the 2×2 "Switch" scenario.
+ * A Verifier for Mixnet proofs.
  *
- * This verifier recomputes the global challenge by concatenating all commitments,
+ * The verifier is make a recursive verification of the MixBatchOutput.
+ * For each proof, this verifier recomputes the global challenge by concatenating all commitments,
  * checks that the branch challenges sum to the global challenge,
  * and then verifies each branch using the provided branch challenge.
  */
@@ -27,7 +27,7 @@ class Verifier(
      *
      * @param orProof The OR-proof to verify.
      */
-    fun verifyOrProof(
+    fun verifySingleOrProof(
         mix2Proof: Mixing.Mix2Proof,
         // Original ciphertexts (for the inputs)
         a1: GroupElement, a2: GroupElement,
@@ -60,9 +60,6 @@ class Verifier(
             a1, a2, d1, d2
         )
 
-//        println("Verifier: Branch A verifies: $okBranchA")
-//        println("Verifier: Branch B verifies: $okBranchB\n")
-
         val result = okBranchA && okBranchB
         if (!result) {
             println("Verifier: One or both branches do not verify. OR-Proof rejected.")
@@ -72,28 +69,6 @@ class Verifier(
         return result
     }
 
-    /**
-     * Computes the global challenge exactly as the prover does by concatenating the serialized commitments
-     * from both AND-proof branches.
-     *
-     * @param orProof The OR-proof containing the AND-proofs to combine.
-     */
-    private fun computeGlobalChallengeCombined(orProof: ZKPOrProof): BigInteger {
-        val baos = ByteArrayOutputStream()
-        fun putAndProof(andProof: ZKPAndProof) {
-            baos.write(andProof.proof1.A_g.data.toByteArray())
-            baos.write(andProof.proof1.A_h.data.toByteArray())
-            baos.write(andProof.proof2.A_g.data.toByteArray())
-            baos.write(andProof.proof2.A_h.data.toByteArray())
-        }
-        putAndProof(orProof.proofA)
-        putAndProof(orProof.proofB)
-        val eBytes = baos.toByteArray()
-//        println("Verifier: Global challenge input bytes: ${eBytes.joinToString("") { "%02x".format(it) }}")
-        val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
-//        println("Verifier: Combined global challenge: ${e.toString(16)}\n")
-        return e
-    }
 
     /**
      * Verifies an AND‑proof branch using the provided branch challenge.
@@ -109,12 +84,12 @@ class Verifier(
         // For second sub‑proof:
         b1: GroupElement, b2: GroupElement, d1: GroupElement, d2: GroupElement
     ): Boolean {
-        val ok1 = verifySingleZKPProvidedChallenge(
+        val ok1 = verifySingleDLProofProvidedChallenge(
             proof = andProof.proof1,
             a1 = a1, a2 = a2, c1 = c1, c2 = c2,
             providedChallenge = providedChallenge
         )
-        val ok2 = verifySingleZKPProvidedChallenge(
+        val ok2 = verifySingleDLProofProvidedChallenge(
             proof = andProof.proof2,
             a1 = b1, a2 = b2, c1 = d1, c2 = d2,
             providedChallenge = providedChallenge
@@ -128,7 +103,7 @@ class Verifier(
      * @param proof The Schnorr proof to verify.
      * @param providedChallenge The challenge to use for verification.
      */
-    private fun verifySingleZKPProvidedChallenge(
+    private fun verifySingleDLProofProvidedChallenge(
         proof: SchnorrProofDL,
         a1: GroupElement, a2: GroupElement,
         c1: GroupElement, c2: GroupElement,
@@ -153,64 +128,9 @@ class Verifier(
         val rhsG = A_gPoint.add(XPoint.multiply(providedChallenge)).normalize()
         val rhsH = A_hPoint.add(YPoint.multiply(providedChallenge)).normalize()
 
-//        println("A_gPoint: ${A_gPoint}")
-//        println("g: ${domainParameters.g}")
-//        println("z: ${proof.z}")
-//        println("providedChallenge: ${providedChallenge}")
-//        println("XPoint: ${XPoint}")
-//        println("c1Point: ${c1Point}")
-//        println("a1Point: ${a1Point}\n")
-//
-//
-//        println("Verifier (using provided branch challenge):")
-//        println("Provided branch challenge: ${providedChallenge.toString(16)}")
-//        println("LHS (z*G): ${CryptoUtils.serializeGroupElement(lhsG).data.joinToString("") { "%02x".format(it) }}")
-//        println("RHS (A_g + challenge*X): ${CryptoUtils.serializeGroupElement(rhsG).data.joinToString("") { "%02x".format(it) }}")
-//        println("LHS (z*H): ${CryptoUtils.serializeGroupElement(lhsH).data.joinToString("") { "%02x".format(it) }}")
-//        println("RHS (A_h + challenge*Y): ${CryptoUtils.serializeGroupElement(rhsH).data.joinToString("") { "%02x".format(it) }}\n")
-
         return (lhsG == rhsG) && (lhsH == rhsH)
     }
 
-    private fun deserializeZKP(mix2Proof: Mixing.Mix2Proof): ZKPOrProof {
-        val proofA = ZKPAndProof(
-            proof1 = SchnorrProofDL(
-                A_g = mix2Proof.firstMessage.clause0.clause0.gr,
-                A_h = mix2Proof.firstMessage.clause0.clause0.hr,
-                z = mix2Proof.finalMessage.clause0.clause0.xcr.toBigInteger()
-            ),
-            proof2 = SchnorrProofDL(
-                A_g = mix2Proof.firstMessage.clause0.clause1.gr,
-                A_h = mix2Proof.firstMessage.clause0.clause1.hr,
-                z = mix2Proof.finalMessage.clause0.clause1.xcr.toBigInteger()
-            )
-        )
-
-        val proofB = ZKPAndProof(
-            proof1 = SchnorrProofDL(
-                A_g = mix2Proof.firstMessage.clause1.clause0.gr,
-                A_h = mix2Proof.firstMessage.clause1.clause0.hr,
-                z = mix2Proof.finalMessage.clause1.clause0.xcr.toBigInteger()
-            ),
-            proof2 = SchnorrProofDL(
-                A_g = mix2Proof.firstMessage.clause1.clause1.gr,
-                A_h = mix2Proof.firstMessage.clause1.clause1.hr,
-                z = mix2Proof.finalMessage.clause1.clause1.xcr.toBigInteger()
-            )
-        )
-
-        return ZKPOrProof(
-            proofA = proofA,
-            proofB = proofB,
-            challengeA = mix2Proof.finalMessage.c0.toBigInteger(),
-            challengeB = BigInteger.ZERO, // The protobuf message does not contain challengeB
-            fullChallenge = BigInteger.ZERO // The protobuf message does not contain fullChallenge
-        )
-    }
-
-    private fun meerkat.protobuf.Crypto.BigInteger.toBigInteger(): BigInteger {
-        return BigInteger(this.data.toByteArray())
-    }
 
     /**
      * Recursively verifies the entire MixBatchOutput by processing specified rows and columns.
@@ -269,57 +189,9 @@ class Verifier(
             return false
         }
 
-//        // Verify proofs for the first column
-//        for (rowIdx in proofsMatrix.indices) {
-//            val proof = proofsMatrix[rowIdx][firstColIdx]
-//
-//            // Extract corresponding ciphertexts
-//            val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
-//            val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
-//            val cCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2])
-//            val dCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2 + 1])
-//
-//            // Verify the proof
-//            if (!verifyOrProof(
-//                    proof,
-//                    aCiphertext.c1, aCiphertext.c2,
-//                    bCiphertext.c1, bCiphertext.c2,
-//                    cCiphertext.c1, cCiphertext.c2,
-//                    dCiphertext.c1, dCiphertext.c2
-//                )
-//            ) {
-//                println("Proof verification failed for row $rowIdx, first column.")
-//                return false
-//            }
-//        }
-
         if (!verifySingleColumn(proofsMatrix, lastColMinus1, lastCol, lastColIdx)) {
             return false
         }
-//
-//        // Verify proofs for the last column
-//        for (rowIdx in proofsMatrix.indices) {
-//            val proof = proofsMatrix[rowIdx][lastColIdx]
-//
-//            // Extract corresponding ciphertexts
-//            val aCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2])
-//            val bCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2 + 1])
-//            val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
-//            val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
-//
-//            // Verify the proof
-//            if (!verifyOrProof(
-//                    proof,
-//                    aCiphertext.c1, aCiphertext.c2,
-//                    bCiphertext.c1, bCiphertext.c2,
-//                    cCiphertext.c1, cCiphertext.c2,
-//                    dCiphertext.c1, dCiphertext.c2
-//                )
-//            ) {
-//                println("Proof verification failed for row $rowIdx, last column.")
-//                return false
-//            }
-//        }
 
         // Reconstruct the inner submatrices by excluding the first and last columns
         val innerProofsMatrix = proofsMatrix.map { it.subList(1, it.size - 1) }
@@ -372,7 +244,7 @@ class Verifier(
             val dCiphertext = CryptoUtils.unwrapCiphertext(lastColCipher[rowIdx * 2 + 1])
 
             // Verify the proof
-            if (!verifyOrProof(
+            if (!verifySingleOrProof(
                     proof,
                     aCiphertext.c1, aCiphertext.c2,
                     bCiphertext.c1, bCiphertext.c2,
@@ -387,6 +259,11 @@ class Verifier(
 
         return true
     }
+
+
+    /*
+        * Helper functions for recursive verification
+     */
 
     /**
      * Maps the last column's result to finalize the permutation.
@@ -404,6 +281,67 @@ class Verifier(
             result[2 * i + 1] = votes[i + half]
         }
         return result.toList()
+    }
+
+    /**
+     * Computes the global challenge exactly as the prover does by concatenating the serialized commitments
+     * from both AND-proof branches.
+     *
+     * @param orProof The OR-proof containing the AND-proofs to combine.
+     */
+    private fun computeGlobalChallengeCombined(orProof: ZKPOrProof): BigInteger {
+        val baos = ByteArrayOutputStream()
+        fun putAndProof(andProof: ZKPAndProof) {
+            baos.write(andProof.proof1.A_g.data.toByteArray())
+            baos.write(andProof.proof1.A_h.data.toByteArray())
+            baos.write(andProof.proof2.A_g.data.toByteArray())
+            baos.write(andProof.proof2.A_h.data.toByteArray())
+        }
+        putAndProof(orProof.proofA)
+        putAndProof(orProof.proofB)
+        val eBytes = baos.toByteArray()
+        val e = CryptoUtils.hashToBigInteger(eBytes).mod(domainParameters.n)
+        return e
+    }
+
+    private fun deserializeZKP(mix2Proof: Mixing.Mix2Proof): ZKPOrProof {
+        val proofA = ZKPAndProof(
+            proof1 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause0.clause0.gr,
+                A_h = mix2Proof.firstMessage.clause0.clause0.hr,
+                z = mix2Proof.finalMessage.clause0.clause0.xcr.toBigInteger()
+            ),
+            proof2 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause0.clause1.gr,
+                A_h = mix2Proof.firstMessage.clause0.clause1.hr,
+                z = mix2Proof.finalMessage.clause0.clause1.xcr.toBigInteger()
+            )
+        )
+
+        val proofB = ZKPAndProof(
+            proof1 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause1.clause0.gr,
+                A_h = mix2Proof.firstMessage.clause1.clause0.hr,
+                z = mix2Proof.finalMessage.clause1.clause0.xcr.toBigInteger()
+            ),
+            proof2 = SchnorrProofDL(
+                A_g = mix2Proof.firstMessage.clause1.clause1.gr,
+                A_h = mix2Proof.firstMessage.clause1.clause1.hr,
+                z = mix2Proof.finalMessage.clause1.clause1.xcr.toBigInteger()
+            )
+        )
+
+        return ZKPOrProof(
+            proofA = proofA,
+            proofB = proofB,
+            challengeA = mix2Proof.finalMessage.c0.toBigInteger(),
+            challengeB = BigInteger.ZERO, // The protobuf message does not contain challengeB
+            fullChallenge = BigInteger.ZERO // The protobuf message does not contain fullChallenge
+        )
+    }
+
+    private fun meerkat.protobuf.Crypto.BigInteger.toBigInteger(): BigInteger {
+        return BigInteger(this.data.toByteArray())
     }
 
 }
