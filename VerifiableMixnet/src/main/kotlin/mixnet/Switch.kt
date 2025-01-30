@@ -21,7 +21,8 @@ import java.security.SecureRandom
  */
 class Switch(
     private val publicKey: PublicKey,
-    private val domainParameters: ECDomainParameters
+    private val domainParameters: ECDomainParameters,
+    private val random: java.security.SecureRandom
 ) : Function<List<Vote>, List<Vote>> {
 
     private var b = 0
@@ -59,9 +60,8 @@ class Switch(
         val swapped = if (b == 1) listOf(votes[1], votes[0]) else listOf(votes[0], votes[1])
 
         // Generate two separate random nonces for each swapped output
-        val secureRandom = SecureRandom.getInstanceStrong()
-        val r1 = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
-        val r2 = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        val r1 = BigIntegerUtils.randomBigInteger(domainParameters.n, random)
+        val r2 = BigIntegerUtils.randomBigInteger(domainParameters.n, random)
 
         // Rerandomize the votes with the generated randoms
         val rerandomizedVotes = swapped.mapIndexed { index, vote ->
@@ -116,7 +116,8 @@ class Switch(
             r1, r2,
             b,
             publicKey,
-            domainParameters
+            domainParameters,
+            random
         )
         return orProof
     }

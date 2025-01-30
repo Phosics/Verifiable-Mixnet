@@ -45,7 +45,8 @@ object ZKPUtils {
         rD: BigInteger,
         switchFlag: Int,  // 0 or 1; remains secret to the prover.
         publicKey: PublicKey,
-        domainParameters: ECDomainParameters
+        domainParameters: ECDomainParameters,
+        random: SecureRandom
     ): ZKPOrProof {
         require(switchFlag == 0 || switchFlag == 1)
 
@@ -73,20 +74,19 @@ object ZKPUtils {
         }
 
         // 1) Compute real branch commitments. (first part of the proof)
-        val realCommit1 = commitRealSubProof(publicKey, domainParameters)
-        val realCommit2 = commitRealSubProof(publicKey, domainParameters)
+        val realCommit1 = commitRealSubProof(publicKey, domainParameters, random)
+        val realCommit2 = commitRealSubProof(publicKey, domainParameters, random)
 
         // 2) For the fake branch, generate ONE fake challenge value.
-        val rnd = SecureRandom.getInstanceStrong()
-        val fakeChallenge = BigIntegerUtils.randomBigInteger(domainParameters.n, rnd)
+        val fakeChallenge = BigIntegerUtils.randomBigInteger(domainParameters.n, random)
         // Use the same fakeChallenge for both simulated sub‑proofs.
         val fakeCommit1 = simulateFakeSubProofWithGivenChallenge(
             fake1Params.a1, fake1Params.a2, fake1Params.c1, fake1Params.c2,
-            fakeChallenge, publicKey, domainParameters
+            fakeChallenge, publicKey, domainParameters, random
         )
         val fakeCommit2 = simulateFakeSubProofWithGivenChallenge(
             fake2Params.a1, fake2Params.a2, fake2Params.c1, fake2Params.c2,
-            fakeChallenge, publicKey, domainParameters
+            fakeChallenge, publicKey, domainParameters, random
         )
 
         // 3) Compute the global challenge e by concatenating all commitments.
@@ -174,9 +174,9 @@ object ZKPUtils {
         c2: GroupElement,
         fakeChallenge: BigInteger, // externally provided, same for both sub‑proofs
         publicKey: PublicKey,
-        domainParameters: ECDomainParameters
+        domainParameters: ECDomainParameters,
+        random: SecureRandom
     ): SchnorrCommitFake {
-        val rnd = SecureRandom.getInstanceStrong()
 
         // Deserialize input points.
         val (a1Point, a2Point, c1Point, c2Point) = listOf(a1, a2, c1, c2).map {
@@ -189,7 +189,7 @@ object ZKPUtils {
         val YPoint = c2Point.add(a2Point.negate()).normalize()
 
         // Choose a random fake response.
-        val zFake = BigIntegerUtils.randomBigInteger(domainParameters.n, rnd)
+        val zFake = BigIntegerUtils.randomBigInteger(domainParameters.n, random)
 
         // Compute fake commitments:
         //   A_g = g^(zFake) - X * fakeChallenge
@@ -222,9 +222,10 @@ object ZKPUtils {
      */
     private fun commitRealSubProof(
         publicKey: PublicKey,
-        domainParameters: ECDomainParameters
+        domainParameters: ECDomainParameters,
+        random: SecureRandom
     ): SchnorrCommitReal {
-        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, SecureRandom.getInstanceStrong())
+        val t = BigIntegerUtils.randomBigInteger(domainParameters.n, random)
         val A_gPoint = domainParameters.g.multiply(t).normalize()
         val hPoint = CryptoUtils.extractECPointFromPublicKey(publicKey)
         val A_hPoint = hPoint.multiply(t).normalize()

@@ -49,7 +49,7 @@ class ZKPTest {
             val voteB = Vote(encryptedMessageB)
 
             // 4) Create a Switch and set its switch flag.
-            val switch = Switch(publicKey, domainParameters)
+            val switch = Switch(publicKey, domainParameters, secureRandom)
             switch.setB(switchFlag)  // sets the secret switch flag (0 or 1)
 
             // 5) Apply the switch to obtain new votes and the OR-proof.

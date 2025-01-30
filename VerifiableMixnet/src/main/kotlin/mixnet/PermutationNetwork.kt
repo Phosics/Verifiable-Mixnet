@@ -14,7 +14,8 @@ import java.security.PublicKey
 class PermutationNetwork(
     private val publicKey: PublicKey,
     private val domainParameters: ECDomainParameters,
-    val n: Int
+    val n: Int,
+    private val random: java.security.SecureRandom
 ) {
     private var switch: Switch? = null
     private var firstCol: MutableList<Switch>? = null
@@ -30,7 +31,7 @@ class PermutationNetwork(
             initializeColumns()
         } else {
             // If n=2, we only have one switch
-            switch = Switch(publicKey, domainParameters)
+            switch = Switch(publicKey, domainParameters, random)
         }
     }
 
@@ -38,16 +39,16 @@ class PermutationNetwork(
      * Initializes the top and bottom sub-networks.
      */
     private fun initializeSubNetworks() {
-        top = PermutationNetwork(publicKey, domainParameters, n / 2)
-        bottom = PermutationNetwork(publicKey, domainParameters, n / 2)
+        top = PermutationNetwork(publicKey, domainParameters, n / 2, random)
+        bottom = PermutationNetwork(publicKey, domainParameters, n / 2, random)
     }
 
     /**
      * Initializes the first and last column switches.
      */
     private fun initializeColumns() {
-        firstCol = MutableList(n / 2) { Switch(publicKey, domainParameters) }
-        lastCol = MutableList(n / 2) { Switch(publicKey, domainParameters) }
+        firstCol = MutableList(n / 2) { Switch(publicKey, domainParameters, random) }
+        lastCol = MutableList(n / 2) { Switch(publicKey, domainParameters, random) }
     }
 
     /**

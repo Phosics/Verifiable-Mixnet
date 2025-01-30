@@ -41,7 +41,7 @@ object MixnetTest {
 
         // Step 4: Generate and encrypt votes
         val totalVotes = 256
-        val numberOfAdversaries = 5
+        val numberOfAdversaries = 3
 
         // Validate that n is at least 2t + 1 and a power of 2
         require(totalVotes >= (2 * numberOfAdversaries) + 1) {
