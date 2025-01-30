@@ -45,22 +45,6 @@ fun main() {
         "VoteSix",
         "VoteSeven",
         "VoteEight",
-        "VoteOne",
-        "VoteTwo",
-        "VoteThree",
-        "VoteFour",
-        "VoteFive",
-        "VoteSix",
-        "VoteSeven",
-        "VoteEight",
-        "VoteOne",
-        "VoteTwo",
-        "VoteThree",
-        "VoteFour",
-        "VoteFive",
-        "VoteSix",
-        "VoteSeven",
-        "VoteEight",
 
 
     )

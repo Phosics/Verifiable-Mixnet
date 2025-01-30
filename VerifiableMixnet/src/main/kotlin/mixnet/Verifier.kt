@@ -246,7 +246,7 @@ class Verifier(
 
         // Base Case: If only one column remains, process it directly
         if (numCols == 1) {
-            return verifySingleColumn(proofsMatrix, ciphertextsMatrix, colIdx = 0)
+            return verifySingleColumn(proofsMatrix, ciphertextsMatrix.map { it[0] }, ciphertextsMatrix.map { it[1] }, colIdx = 0)
         }
 
         // Recursive Case: Process first and last columns
@@ -265,61 +265,61 @@ class Verifier(
         var lastColMinus1 = ciphertextsMatrix.map { it[lastColIdxCipher - 1] }
         lastColMinus1 = applyLastColMap(lastColMinus1)
 
-//        if (!verifySingleColumn(proofsMatrix, ciphertextsMatrix, firstColIdx)) {
-//            return false
-//        }
+        if (!verifySingleColumn(proofsMatrix, firstCol, firstColPlus1, firstColIdx)) {
+            return false
+        }
+
+//        // Verify proofs for the first column
+//        for (rowIdx in proofsMatrix.indices) {
+//            val proof = proofsMatrix[rowIdx][firstColIdx]
 //
-//        if (!verifySingleColumn(proofsMatrix, ciphertextsMatrix, lastColIdx)) {
-//            return false
+//            // Extract corresponding ciphertexts
+//            val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
+//            val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
+//            val cCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2])
+//            val dCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2 + 1])
+//
+//            // Verify the proof
+//            if (!verifyOrProof(
+//                    proof,
+//                    aCiphertext.c1, aCiphertext.c2,
+//                    bCiphertext.c1, bCiphertext.c2,
+//                    cCiphertext.c1, cCiphertext.c2,
+//                    dCiphertext.c1, dCiphertext.c2
+//                )
+//            ) {
+//                println("Proof verification failed for row $rowIdx, first column.")
+//                return false
+//            }
 //        }
 
-        // Verify proofs for the first column
-        for (rowIdx in proofsMatrix.indices) {
-            val proof = proofsMatrix[rowIdx][firstColIdx]
-
-            // Extract corresponding ciphertexts
-            val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
-            val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
-            val cCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2])
-            val dCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2 + 1])
-
-            // Verify the proof
-            if (!verifyOrProof(
-                    proof,
-                    aCiphertext.c1, aCiphertext.c2,
-                    bCiphertext.c1, bCiphertext.c2,
-                    cCiphertext.c1, cCiphertext.c2,
-                    dCiphertext.c1, dCiphertext.c2
-                )
-            ) {
-                println("Proof verification failed for row $rowIdx, first column.")
-                return false
-            }
+        if (!verifySingleColumn(proofsMatrix, lastColMinus1, lastCol, lastColIdx)) {
+            return false
         }
-
-        // Verify proofs for the last column
-        for (rowIdx in proofsMatrix.indices) {
-            val proof = proofsMatrix[rowIdx][lastColIdx]
-
-            // Extract corresponding ciphertexts
-            val aCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2])
-            val bCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2 + 1])
-            val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
-            val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
-
-            // Verify the proof
-            if (!verifyOrProof(
-                    proof,
-                    aCiphertext.c1, aCiphertext.c2,
-                    bCiphertext.c1, bCiphertext.c2,
-                    cCiphertext.c1, cCiphertext.c2,
-                    dCiphertext.c1, dCiphertext.c2
-                )
-            ) {
-                println("Proof verification failed for row $rowIdx, last column.")
-                return false
-            }
-        }
+//
+//        // Verify proofs for the last column
+//        for (rowIdx in proofsMatrix.indices) {
+//            val proof = proofsMatrix[rowIdx][lastColIdx]
+//
+//            // Extract corresponding ciphertexts
+//            val aCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2])
+//            val bCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2 + 1])
+//            val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
+//            val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
+//
+//            // Verify the proof
+//            if (!verifyOrProof(
+//                    proof,
+//                    aCiphertext.c1, aCiphertext.c2,
+//                    bCiphertext.c1, bCiphertext.c2,
+//                    cCiphertext.c1, cCiphertext.c2,
+//                    dCiphertext.c1, dCiphertext.c2
+//                )
+//            ) {
+//                println("Proof verification failed for row $rowIdx, last column.")
+//                return false
+//            }
+//        }
 
         // Reconstruct the inner submatrices by excluding the first and last columns
         val innerProofsMatrix = proofsMatrix.map { it.subList(1, it.size - 1) }
@@ -357,7 +357,8 @@ class Verifier(
      */
     private fun verifySingleColumn(
         proofsMatrix: List<List<Mixing.Mix2Proof>>,
-        ciphertextsMatrix: List<List<Crypto.RerandomizableEncryptedMessage>>,
+        firstColCipher : List<Crypto.RerandomizableEncryptedMessage>,
+        lastColCipher : List<Crypto.RerandomizableEncryptedMessage>,
         colIdx: Int = 0
     ): Boolean {
 
@@ -365,10 +366,10 @@ class Verifier(
             val proof = proofsMatrix[rowIdx][colIdx]
 
             // Extract corresponding ciphertexts
-            val aCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2][colIdx])
-            val bCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2 + 1][colIdx])
-            val cCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2][colIdx + 1])
-            val dCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2 + 1][colIdx + 1])
+            val aCiphertext = CryptoUtils.unwrapCiphertext(firstColCipher[rowIdx * 2])
+            val bCiphertext = CryptoUtils.unwrapCiphertext(firstColCipher[rowIdx * 2 + 1])
+            val cCiphertext = CryptoUtils.unwrapCiphertext(lastColCipher[rowIdx * 2])
+            val dCiphertext = CryptoUtils.unwrapCiphertext(lastColCipher[rowIdx * 2 + 1])
 
             // Verify the proof
             if (!verifyOrProof(
