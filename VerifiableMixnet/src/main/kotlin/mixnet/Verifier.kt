@@ -67,7 +67,7 @@ class Verifier(
         if (!result) {
             println("Verifier: One or both branches do not verify. OR-Proof rejected.")
         } else {
-            println("Verifier: Both branches verify. OR-Proof accepted.")
+//            println("Verifier: Both branches verify. OR-Proof accepted.")
         }
         return result
     }
@@ -213,98 +213,178 @@ class Verifier(
     }
 
     /**
-     * Verifies the entire MixBatchOutput.
+     * Recursively verifies the entire MixBatchOutput by processing specified rows and columns.
      *
      * @param mixBatchOutput The MixBatchOutput to verify.
      * @return True if all proofs are valid, False otherwise.
      */
     fun verifyMixBatchOutput(mixBatchOutput: MixBatchOutput): Boolean {
+        // Start the recursive verification covering all rows and columns
+        return verifyRecursive(
+            proofsMatrix = mixBatchOutput.proofsMatrix,
+            ciphertextsMatrix = mixBatchOutput.ciphertextsMatrix
+        )
+    }
 
-        val numProofCols = mixBatchOutput.proofsMatrix[0].size
+    /**
+     * Recursive helper function to verify a submatrix of MixBatchOutput.
+     *
+     * @param proofsMatrix The subset of proofs to verify.
+     * @param ciphertextsMatrix The subset of ciphertexts corresponding to the proofs.
+     * @return True if all proofs in the specified submatrix are valid, False otherwise.
+     */
+    private fun verifyRecursive(
+        proofsMatrix: List<List<Mixing.Mix2Proof>>,
+        ciphertextsMatrix: List<List<Crypto.RerandomizableEncryptedMessage>>
+    ): Boolean {
+        // Base Case: If there are no columns to process, return true
+        if (proofsMatrix.isEmpty() || proofsMatrix[0].isEmpty()) {
+            return true
+        }
 
-        val mid = numProofCols / 2
+        val numCols = proofsMatrix[0].size
 
-        println("num of rows: ${mixBatchOutput.proofsMatrix.size}")
-        println("num of cols: ${mixBatchOutput.proofsMatrix[0].size}")
+        // Base Case: If only one column remains, process it directly
+        if (numCols == 1) {
+            return verifySingleColumn(proofsMatrix, ciphertextsMatrix, colIdx = 0)
+        }
 
-        println("num of rows cipher: ${mixBatchOutput.ciphertextsMatrix.size}")
-        println("num of cols cipher: ${mixBatchOutput.ciphertextsMatrix[0].size}")
+        // Recursive Case: Process first and last columns
+        val firstColIdx = 0
+        val lastColIdx = numCols - 1
 
-        for (colIdx in mixBatchOutput.proofsMatrix[0].indices) {
+        // Extract the first and last columns for the current subset of rows
+        val firstCol = ciphertextsMatrix.map { it[firstColIdx] }
+        var firstColPlus1 = ciphertextsMatrix.map { it[firstColIdx + 1] }
+        firstColPlus1 = applyLastColMap(firstColPlus1)
 
-            var firstCol: List<Crypto. RerandomizableEncryptedMessage>
-            var lastCol: List<Crypto. RerandomizableEncryptedMessage>
+        val numColsCipher = ciphertextsMatrix[0].size
+        val lastColIdxCipher = numColsCipher - 1
 
-            if (colIdx <= numProofCols / 2 - 1) {
+        val lastCol = ciphertextsMatrix.map { it[lastColIdxCipher] }
+        var lastColMinus1 = ciphertextsMatrix.map { it[lastColIdxCipher - 1] }
+        lastColMinus1 = applyLastColMap(lastColMinus1)
 
-                println("if1 = $colIdx")
+//        if (!verifySingleColumn(proofsMatrix, ciphertextsMatrix, firstColIdx)) {
+//            return false
+//        }
+//
+//        if (!verifySingleColumn(proofsMatrix, ciphertextsMatrix, lastColIdx)) {
+//            return false
+//        }
 
-                firstCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
+        // Verify proofs for the first column
+        for (rowIdx in proofsMatrix.indices) {
+            val proof = proofsMatrix[rowIdx][firstColIdx]
 
-                // Extract Votes from the target column
-                val temp = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
+            // Extract corresponding ciphertexts
+            val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
+            val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
+            val cCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2])
+            val dCiphertext = CryptoUtils.unwrapCiphertext(firstColPlus1[rowIdx * 2 + 1])
 
-                // Apply the permutation mapping
-                lastCol = applyLastColMap(temp)
-
-            } else if (colIdx >= (numProofCols + 1) / 2) {
-
-                println("if2 = $colIdx")
-
-                val temp = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
-
-                firstCol = applyFirstColMap(temp)
-
-                lastCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
-
-            } else {
-
-                println("else = $colIdx")
-
-                firstCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx] }
-
-                lastCol = mixBatchOutput.ciphertextsMatrix.map { it[colIdx + 1] }
-            }
-
-
-            for (rowIdx in mixBatchOutput.proofsMatrix.indices) {
-                val proof = mixBatchOutput.proofsMatrix[rowIdx][colIdx]
-
-//                println("a index: ${rowIdx * 2}, $colIdx")
-//                println("b index: ${rowIdx * 2 + 1}, $colIdx")
-//                println("c index: ${rowIdx * 2}, ${colIdx + 1}")
-//                println("d index: ${rowIdx * 2 + 1}, ${colIdx + 1}")
-
-                // Extract the original and final ciphertexts for verification
-                val aCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2])
-                val bCiphertext = CryptoUtils.unwrapCiphertext(firstCol[rowIdx * 2 + 1])
-                val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
-                val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
-
-                // Verify the proof
-                if (!verifyOrProof(proof, aCiphertext.c1, aCiphertext.c2, bCiphertext.c1, bCiphertext.c2, cCiphertext.c1, cCiphertext.c2, dCiphertext.c1, dCiphertext.c2)) {
-//                    return false
-                }
+            // Verify the proof
+            if (!verifyOrProof(
+                    proof,
+                    aCiphertext.c1, aCiphertext.c2,
+                    bCiphertext.c1, bCiphertext.c2,
+                    cCiphertext.c1, cCiphertext.c2,
+                    dCiphertext.c1, dCiphertext.c2
+                )
+            ) {
+                println("Proof verification failed for row $rowIdx, first column.")
+                return false
             }
         }
+
+        // Verify proofs for the last column
+        for (rowIdx in proofsMatrix.indices) {
+            val proof = proofsMatrix[rowIdx][lastColIdx]
+
+            // Extract corresponding ciphertexts
+            val aCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2])
+            val bCiphertext = CryptoUtils.unwrapCiphertext(lastColMinus1[rowIdx * 2 + 1])
+            val cCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2])
+            val dCiphertext = CryptoUtils.unwrapCiphertext(lastCol[rowIdx * 2 + 1])
+
+            // Verify the proof
+            if (!verifyOrProof(
+                    proof,
+                    aCiphertext.c1, aCiphertext.c2,
+                    bCiphertext.c1, bCiphertext.c2,
+                    cCiphertext.c1, cCiphertext.c2,
+                    dCiphertext.c1, dCiphertext.c2
+                )
+            ) {
+                println("Proof verification failed for row $rowIdx, last column.")
+                return false
+            }
+        }
+
+        // Reconstruct the inner submatrices by excluding the first and last columns
+        val innerProofsMatrix = proofsMatrix.map { it.subList(1, it.size - 1) }
+        val innerCiphertextsMatrix = ciphertextsMatrix.map { it.subList(1, it.size - 1) }
+
+        // Split the rows into upper and lower subsets
+        var midRow = proofsMatrix.size / 2
+        val upperProofs = innerProofsMatrix.take(midRow)
+        val lowerProofs = innerProofsMatrix.drop(midRow)
+
+        midRow = ciphertextsMatrix.size / 2
+        val upperCiphertexts = innerCiphertextsMatrix.take(midRow)
+        val lowerCiphertexts = innerCiphertextsMatrix.drop(midRow)
+
+        // Recursive call for the upper subset
+        if (!verifyRecursive(upperProofs, upperCiphertexts)) {
+            return false
+        }
+
+        // Recursive call for the lower subset
+        if (!verifyRecursive(lowerProofs, lowerCiphertexts)) {
+            return false
+        }
+
+        // If all recursive calls pass, return true
         return true
     }
 
     /**
-     * Maps the first column's result to prepare inputs for sub-networks.
+     * Verifies a single column of proofs.
+     *
+     * @param proofsMatrix The subset of proofs to verify (single column).
+     * @param ciphertextsMatrix The subset of ciphertexts corresponding to the proofs.
+     * @return True if all proofs in the column are valid, False otherwise.
      */
-    private fun applyFirstColMap(votes:
-                                 List<Crypto. RerandomizableEncryptedMessage>):
-            List<Crypto. RerandomizableEncryptedMessage> {
-        val size = votes.size
-        val half = size / 2
-        val result = MutableList(size) { votes[it] }  // copy
+    private fun verifySingleColumn(
+        proofsMatrix: List<List<Mixing.Mix2Proof>>,
+        ciphertextsMatrix: List<List<Crypto.RerandomizableEncryptedMessage>>,
+        colIdx: Int = 0
+    ): Boolean {
 
-        for (i in 0 until half) {
-            result[i] = votes[2 * i]
-            result[i + half] = votes[2 * i + 1]
+        for (rowIdx in proofsMatrix.indices) {
+            val proof = proofsMatrix[rowIdx][colIdx]
+
+            // Extract corresponding ciphertexts
+            val aCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2][colIdx])
+            val bCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2 + 1][colIdx])
+            val cCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2][colIdx + 1])
+            val dCiphertext = CryptoUtils.unwrapCiphertext(ciphertextsMatrix[rowIdx * 2 + 1][colIdx + 1])
+
+            // Verify the proof
+            if (!verifyOrProof(
+                    proof,
+                    aCiphertext.c1, aCiphertext.c2,
+                    bCiphertext.c1, bCiphertext.c2,
+                    cCiphertext.c1, cCiphertext.c2,
+                    dCiphertext.c1, dCiphertext.c2
+                )
+            ) {
+                println("Proof verification failed for row $rowIdx, for column $colIdx.")
+                return false
+            }
         }
-        return result.toList()
+
+        return true
     }
 
     /**
