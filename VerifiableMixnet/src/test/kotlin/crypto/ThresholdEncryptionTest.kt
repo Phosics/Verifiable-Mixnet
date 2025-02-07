@@ -62,7 +62,7 @@ class ThresholdCryptoConfigTest {
         if (Security.getProvider("BC") == null) {
             Security.addProvider(BouncyCastleProvider())
         }
-        val domainParameters: ECDomainParameters = CryptoConfig.ecDomainParameters
+        val domainParameters: ECDomainParameters = ThresholdCryptoConfig.ecDomainParameters
         val n = 10
         val t = 6
         val messageCount = 16
