@@ -40,7 +40,7 @@ class ThresholdServer(
     // Each server's private incoming queue.
     private val incomingQueue: BlockingQueue<ShareMessage> = commMap[id]!!
 
-    // The secret share computed from all received shares.
+    // The secret share computed from all received shares (i.e. F(id)).
     private var secretShare: BigInteger? = null
 
     override fun run() {
@@ -58,17 +58,17 @@ class ThresholdServer(
             val msg = incomingQueue.take()
             receivedShares.add(msg.share)
         }
-        // Compute secret share: S_i = sum(receivedShares) mod order.
+        // Compute secret share: S = sum(receivedShares) mod order.
         secretShare = receivedShares.fold(BigInteger.ZERO) { acc, s -> acc.add(s).mod(order) }
     }
 
-    // Computes the partial decryption: d_i = S_i * c1.
+    // Computes the partial decryption: d_i = S * c1.
     fun computePartialDecryption(c1: ECPoint): ECPoint {
         val s = secretShare ?: throw IllegalStateException("Server $id: secret share not computed")
         return c1.multiply(s).normalize()
     }
 
-    // Returns the partial public key: h_i = S_i * G.
+    // Returns the partial public key: h = S * G.
     fun getPartialPublicKey(): ECPoint {
         val s = secretShare ?: throw IllegalStateException("Server $id: secret share not computed")
         return domainParameters.g.multiply(s).normalize()
@@ -97,14 +97,27 @@ class ThresholdServer(
  */
 object ThresholdCoordinator {
 
+    // Compute the Lagrange coefficient for index i (using the provided list of indices) at x = 0.
+    private fun lagrangeCoefficient(i: Int, indices: List<Int>, modulus: BigInteger): BigInteger {
+        var num = BigInteger.ONE
+        var den = BigInteger.ONE
+        val xi = BigInteger.valueOf(i.toLong())
+        for (j in indices) {
+            if (j == i) continue
+            val xj = BigInteger.valueOf(j.toLong())
+            num = num.multiply(xj.negate()).mod(modulus)
+            den = den.multiply(xi.subtract(xj)).mod(modulus)
+        }
+        return num.multiply(den.modInverse(modulus)).mod(modulus)
+    }
+
     /**
      * Sets up threshold key generation.
      *
      * 1. Creates a communication map (server id → BlockingQueue).
      * 2. Instantiates n ThresholdServer threads.
      * 3. Starts all threads to perform share distribution and secret share computation.
-     * 4. Collects each server’s partial public key and computes the overall public key Q = G^(∑S_i)
-     *    by adding the partial public keys.
+     * 4. Reconstructs the overall public key Q = F(0)*G using Lagrange interpolation on all n shares.
      *
      * @return Pair of overall public key Q and the list of servers.
      */
@@ -128,9 +141,13 @@ object ThresholdCoordinator {
         // Wait for all servers to finish.
         threads.forEach { it.join() }
 
-        // Compute overall public key: Q = ∑ (S_i * G).
-        val overallPublicKey = servers.map { it.getPartialPublicKey() }
-            .reduce { acc, pubKey -> acc.add(pubKey).normalize() }
+        // Reconstruct overall public key Q = F(0)*G using all n shares.
+        val indices = (1..n).toList()
+        var overallPublicKey: ECPoint = domainParameters.g.curve.infinity
+        servers.forEach { server ->
+            val coeff = lagrangeCoefficient(server.getId(), indices, domainParameters.n)
+            overallPublicKey = overallPublicKey.add(server.getPartialPublicKey().multiply(coeff)).normalize()
+        }
         return Pair(overallPublicKey, servers)
     }
 
@@ -138,8 +155,8 @@ object ThresholdCoordinator {
      * Performs threshold decryption.
      *
      * Given an encrypted message (RerandomizableEncryptedMessage) where
-     * ciphertext c = (c1, c2) = (k*G, M + k*Q), a subset (at least t) of servers compute
-     * their partial decryption d_i = S_i * c1. Using Lagrange interpolation on these partials,
+     * ciphertext c = (c1, c2) = (k*G, M + k*Q), a subset (at least t servers) computes
+     * their partial decryption d_i = S * c1. Using Lagrange interpolation on these partials,
      * the coordinator reconstructs D = Σ λ_i * d_i and recovers M = c2 - D.
      *
      * @param encryptedMessage The rerandomizable encrypted message.
@@ -172,23 +189,10 @@ object ThresholdCoordinator {
         partials: List<Pair<Int, ECPoint>>,
         domainParameters: ECDomainParameters
     ): ECPoint {
-        fun lagrangeCoefficient(i: Int, indices: List<Int>): BigInteger {
-            val order = domainParameters.n
-            var num = BigInteger.ONE
-            var den = BigInteger.ONE
-            val xi = BigInteger.valueOf(i.toLong())
-            for (j in indices) {
-                if (j == i) continue
-                val xj = BigInteger.valueOf(j.toLong())
-                num = num.multiply(xj.negate()).mod(order)
-                den = den.multiply(xi.subtract(xj)).mod(order)
-            }
-            return num.multiply(den.modInverse(order)).mod(order)
-        }
         val indices = partials.map { it.first }
         var combined: ECPoint = domainParameters.g.curve.infinity
-        for ((id, partial) in partials) {
-            val coeff = lagrangeCoefficient(id, indices)
+        partials.forEach { (id, partial) ->
+            val coeff = lagrangeCoefficient(id, indices, domainParameters.n)
             combined = combined.add(partial.multiply(coeff)).normalize()
         }
         return combined
