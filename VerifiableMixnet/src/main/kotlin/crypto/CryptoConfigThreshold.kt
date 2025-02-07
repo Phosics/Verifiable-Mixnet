@@ -1,5 +1,6 @@
 package org.example.crypto
 
+import meerkat.protobuf.ConcreteCrypto
 import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.asn1.x9.X9ECParameters
@@ -7,6 +8,8 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import org.bouncycastle.math.ec.ECPoint
+import org.example.mixnet.SchnorrProofDL
+import org.example.mixnet.ZKPUtils
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.PublicKey
@@ -15,8 +18,17 @@ import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
 /**
- * ThresholdCryptoConfig provides threshold key generation and decryption in a
- * "t-out-of-n" scheme. It follows the same style as CryptoConfig.
+ * Data class representing the overall threshold decryption result.
+ * It contains the decrypted message as well as a list of (serverId, SchnorrProofDL) pairs.
+ */
+data class ThresholdDecryptionResult(
+    val message: String,
+    val proofs: List<Pair<Int, SchnorrProofDL>>
+)
+
+/**
+ * ThresholdCryptoConfig provides threshold key generation and decryption (with attached proofs)
+ * in a "t-out-of-n" scheme. Its constants and lazy‑loading style follow that of CryptoConfig.
  */
 object ThresholdCryptoConfig {
 
@@ -50,7 +62,7 @@ object ThresholdCryptoConfig {
         return keyFactory.generatePublic(pubSpec)
     }
 
-    // --- Internal classes and helper methods ---
+    // --- Internal classes and helper methods for share distribution and decryption ---
 
     /**
      * Message used for inter-thread communication.
@@ -67,12 +79,12 @@ object ThresholdCryptoConfig {
         private val id: Int,           // Server identifier (1-indexed)
         private val n: Int,            // Total number of servers
         private val t: Int,            // Threshold value
-        private val commMap: Map<Int, BlockingQueue<ShareMessage>>
+        private val commMap: Map<Int, BlockingQueue<ShareMessage>>,
+        private val random: SecureRandom // Provided random instance
     ) : Runnable {
 
         private val order: BigInteger = ecDomainParameters.n
-        private val secureRandom: SecureRandom = SecureRandom.getInstanceStrong()
-
+        // Use the provided random instance instead of creating a new one.
         // Temporary polynomial and outgoing shares; these are destroyed after share distribution.
         private var polynomial: List<BigInteger>? = generatePolynomial(t - 1)
         private var outgoingShares: Map<Int, BigInteger>? = (1..n).associate { x ->
@@ -83,7 +95,9 @@ object ThresholdCryptoConfig {
         private val incomingQueue: BlockingQueue<ShareMessage> = commMap[id]!!
 
         // The computed secret share S = F(id).
-        private var secretShare: BigInteger? = null
+        // (Kept private – only used to generate the decryption share and ZKP.)
+        internal var secretShare: BigInteger? = null
+            private set
 
         override fun run() {
             // Send each share to its destination.
@@ -105,25 +119,64 @@ object ThresholdCryptoConfig {
         }
 
         /**
-         * Computes the partial decryption: d_i = S * c1.
+         * Computes the partial decryption: d_i = c1^{s_i}.
          */
         fun computePartialDecryption(c1: ECPoint): ECPoint {
-            val s = secretShare ?: throw IllegalStateException("Server $id: secret share not computed")
+            val s = secretShare ?: throw IllegalStateException("Secret share not computed for server $id")
             return c1.multiply(s).normalize()
         }
 
         /**
-         * Returns the partial public key: h_i = S * G.
+         * Returns the partial public key: h_i = g^{s_i}.
          */
         fun getPartialPublicKey(): ECPoint {
-            val s = secretShare ?: throw IllegalStateException("Server $id: secret share not computed")
+            val s = secretShare ?: throw IllegalStateException("Secret share not computed for server $id")
             return ecDomainParameters.g.multiply(s).normalize()
         }
 
         fun getId(): Int = id
 
+        /**
+         * Generates a Schnorr ZKP proving that the decryption share d_i = c1^{s_i} was computed using
+         * the same secret share s_i that yields h_i = g^{s_i}.
+         *
+         * It proves knowledge of s_i such that:
+         *      h_i = g^{s_i}   and   d_i = c1^{s_i}.
+         *
+         * This uses a Fiat–Shamir transformation over the commitments.
+         */
+        fun generateDecryptionProof(c1: ECPoint): SchnorrProofDL {
+            val s = secretShare ?: throw IllegalStateException("Secret share not computed for server $id")
+            // h_i = g^{s_i} (server's public share)
+            val h_i = getPartialPublicKey()
+            // Convert c1 to a PublicKey so that commitRealSubProof uses c1 as the second base.
+            val c1AsPublicKey = ecPointToPublicKey(c1)
+            // Commit: choose a random t and compute commitments.
+            val commit = ZKPUtils.commitRealSubProof(c1AsPublicKey, ecDomainParameters, random)
+            // Compute the decryption share d_i = c1^{s_i}.
+            val d_i = c1.multiply(s).normalize()
+
+            // Build a ByteArrayOutputStream to accumulate all the bytes.
+            val baos = java.io.ByteArrayOutputStream()
+            fun putCommit(A_g: ConcreteCrypto.GroupElement, A_h: ConcreteCrypto.GroupElement) {
+                baos.write(A_g.data.toByteArray())
+                baos.write(A_h.data.toByteArray())
+            }
+            // Write the commitments.
+            putCommit(commit.A_g, commit.A_h)
+            // Write the serialized public share and decryption share.
+            baos.write(CryptoUtils.serializeGroupElement(h_i).data.toByteArray())
+            baos.write(CryptoUtils.serializeGroupElement(d_i).data.toByteArray())
+            // Compute the challenge from the concatenated bytes.
+            val challenge = CryptoUtils.hashToBigInteger(baos.toByteArray())
+
+            // Finalize and return the Schnorr proof.
+            return ZKPUtils.finalizeRealSubProof(commit, challenge, s, ecDomainParameters)
+        }
+
+
         private fun generatePolynomial(degree: Int): List<BigInteger> =
-            List(degree + 1) { BigIntegerUtils.randomBigInteger(order, secureRandom) }
+            List(degree + 1) { BigIntegerUtils.randomBigInteger(order, random) }
 
         private fun evaluatePolynomial(poly: List<BigInteger>, x: BigInteger): BigInteger {
             var result = BigInteger.ZERO
@@ -173,21 +226,23 @@ object ThresholdCryptoConfig {
 
     /**
      * Generates threshold key shares using n servers with threshold t.
+     *
      * Internally, this creates inter-thread communication channels, instantiates n ThresholdServer threads,
      * starts them, and then reconstructs the overall public key Q = F(0)*G via Lagrange interpolation.
      *
      * @param n Total number of servers.
      * @param t Threshold (minimum number of servers needed for decryption).
+     * @param random A SecureRandom instance provided by the caller.
      * @return Pair of overall PublicKey and list of ThresholdServer instances.
      */
-    fun generateThresholdKeyPair(n: Int, t: Int): Pair<PublicKey, List<ThresholdServer>> {
+    fun generateThresholdKeyPair(n: Int, t: Int, random: SecureRandom): Pair<PublicKey, List<ThresholdServer>> {
         // Create inter-thread communication channels (one BlockingQueue per server).
         val commMap: Map<Int, BlockingQueue<ShareMessage>> =
             (1..n).associateWith { LinkedBlockingQueue<ShareMessage>() }
 
-        // Instantiate servers.
+        // Instantiate servers, each receiving the same random instance.
         val servers = (1..n).map { id ->
-            ThresholdServer(id, n, t, commMap)
+            ThresholdServer(id, n, t, commMap, random)
         }
         // Start each server in its own thread.
         val threads = servers.map { server ->
@@ -200,7 +255,8 @@ object ThresholdCryptoConfig {
         var overallPublicKeyPoint: ECPoint = ecDomainParameters.g.curve.infinity
         servers.forEach { server ->
             val coeff = lagrangeCoefficient(server.getId(), indices, ecDomainParameters.n)
-            overallPublicKeyPoint = overallPublicKeyPoint.add(server.getPartialPublicKey().multiply(coeff)).normalize()
+            overallPublicKeyPoint =
+                overallPublicKeyPoint.add(server.getPartialPublicKey().multiply(coeff)).normalize()
         }
         return Pair(ecPointToPublicKey(overallPublicKeyPoint), servers)
     }
@@ -209,18 +265,21 @@ object ThresholdCryptoConfig {
      * Performs threshold decryption on a RerandomizableEncryptedMessage.
      *
      * Given a ciphertext c = (c1, c2) where c1 = k*G and c2 = M + k*Q,
-     * a subset (of at least t servers) computes partial decryptions d_i = S_i * c1.
+     * a subset (of at least t servers) computes partial decryptions d_i = c1^{s_i}.
      * These partials are combined via Lagrange interpolation to compute D = k*F(0)*G,
      * and then the message is recovered as M = c2 - D.
      *
+     * In addition, for each participating server a Schnorr proof is generated showing that
+     * the decryption share was computed correctly.
+     *
      * @param encryptedMessage The ciphertext.
      * @param participatingServers The list of servers (must be at least t in number) participating in decryption.
-     * @return The decrypted message as a String.
+     * @return A ThresholdDecryptionResult containing the decrypted message and the proofs.
      */
     fun thresholdDecrypt(
         encryptedMessage: RerandomizableEncryptedMessage,
         participatingServers: List<ThresholdServer>
-    ): String {
+    ): ThresholdDecryptionResult {
         val ciphertext = CryptoUtils.unwrapCiphertext(encryptedMessage)
         val c1 = CryptoUtils.deserializeGroupElement(ciphertext.c1, ecDomainParameters)
         val c2 = CryptoUtils.deserializeGroupElement(ciphertext.c2, ecDomainParameters)
@@ -231,6 +290,11 @@ object ThresholdCryptoConfig {
         }
         val decryptionFactor = combinePartialDecryptions(partialDecryptions, ecDomainParameters)
         val mPoint = c2.subtract(decryptionFactor).normalize()
-        return MessageUtils.decodeECPointToMessage(mPoint)
+        val message = MessageUtils.decodeECPointToMessage(mPoint)
+        // Generate proofs for each participating server.
+        val proofs = participatingServers.map { server ->
+            Pair(server.getId(), server.generateDecryptionProof(c1))
+        }
+        return ThresholdDecryptionResult(message, proofs)
     }
 }

@@ -220,7 +220,7 @@ object ZKPUtils {
      *    A_g = g^t  and  A_h = h^t,
      * where t is chosen randomly.
      */
-    private fun commitRealSubProof(
+    fun commitRealSubProof(
         publicKey: PublicKey,
         domainParameters: ECDomainParameters,
         random: SecureRandom
@@ -246,7 +246,7 @@ object ZKPUtils {
      * @param r The secret random witness.
      * @return A SchnorrProofDL object containing the final proof.
      */
-    private fun finalizeRealSubProof(
+    fun finalizeRealSubProof(
         commit: SchnorrCommitReal,
         challengeReal: BigInteger,
         r: BigInteger,
