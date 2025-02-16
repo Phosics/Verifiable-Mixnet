@@ -1,5 +1,8 @@
 package org.example.mixnet
 
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.example.crypto.ElGamal
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
@@ -40,5 +43,4 @@ data class Vote(
         // Return a new Vote instance with the rerandomized ciphertext
         return copy(encryptedMessage = rerandomizedMessage)
     }
-
 }

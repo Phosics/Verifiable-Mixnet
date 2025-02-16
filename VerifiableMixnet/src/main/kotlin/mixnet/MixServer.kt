@@ -1,10 +1,12 @@
 package mixnet
 
+import kotlinx.coroutines.delay
 import meerkat.protobuf.Mixing
+import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
-import org.example.mixnet.MixBatchOutput
-import org.example.mixnet.Vote
+import org.example.bulltinboard.BulletinBoardVote
+import org.example.mixnet.*
 import java.security.PublicKey
 import java.util.*
 
@@ -13,10 +15,12 @@ import java.util.*
  * It serializes the output as per the specified on-disk format.
  */
 class MixServer(
-    private val publicKey: PublicKey,
-    private val domainParameters: ECDomainParameters,
-    private val n: Int
-) {
+    publicKey: PublicKey,
+    domainParameters: ECDomainParameters,
+    private val index: Int) {
+    private val bulletinBoard : BulletinBoard = BulletinBoard()
+    private val n : Int = bulletinBoard.numberOfVotes
+
     /**
      * Creation:
      * Inputs:
@@ -25,15 +29,56 @@ class MixServer(
      * 3.   Create a random permutation of the n votes
      * 4.   Run the algorithm of the shuffle to fix the switches
      */
-    private val permutationNetwork = PermutationNetwork(publicKey, domainParameters, n)
-    private val random = Random()
-
+    private val permutationNetwork : PermutationNetwork
+    private val random = Random(System.currentTimeMillis())
+    private val logger = LogManager.getLogger(MixServer::class.java)
 
     init {
         require(n > 0 && (n and (n - 1)) == 0) {
             "n must be a power of 2."
         }
         validatePublicKey(publicKey)
+        permutationNetwork = PermutationNetwork(publicKey, domainParameters, n)
+    }
+
+    fun getIndex() : Int {
+        return index
+    }
+
+    suspend fun run() {
+        logger.info("Configuring...")
+        configureRandomly()
+
+        logger.info("Sleeping for ${(index + 1) * TIMEOUT} ms...")
+        delay(((index + 1) * TIMEOUT).toLong())
+        logger.info("Server ${index + 1} Waking up...")
+
+        val (mixedVotes, ciphertextsMatrix, proofsMatrix) = permutationNetwork.apply(getVotes())
+
+        bulletinBoard.sendMixBatchOutput(createMixBatchOutput(ciphertextsMatrix, proofsMatrix))
+
+        logger.info("Published votes and proofs.")
+    }
+
+    private fun getVotes(): List<Vote> {
+        logger.info("Getting the starting votes...")
+        return bulletinBoard.votes
+//        val posts = bulletinBoard.read()
+//
+//        for (i in posts.indices) {
+//            logger.info("Verifying the votes publish row $i...")
+//            val tempBulletinBoardObject = posts[i]
+//
+//            if(!verifyBulletinBoardObject(tempBulletinBoardObject)) {
+//                logger.info("Verification Failed, skipping row.")
+//                continue
+//            }
+//
+//            logger.info("Verification Successful.")
+//            votes = tempBulletinBoardObject.getVotes()
+//        }
+//
+//        return votes
     }
 
     private fun validatePublicKey(key: PublicKey) {
@@ -65,39 +110,19 @@ class MixServer(
     /**
      * Configures the network with a random permutation.
      */
-    fun configureRandomly() {
+    private fun configureRandomly() {
         val sigma = randomPermutation(n)
         permutationNetwork.configNetBySigma(sigma)
     }
 
-    /**
-     * Applies the mix to the given votes.
-     *
-     * @param votes A list of n Vote instances.
-     * @return A Triple containing mixed votes, ciphertexts matrix, and proofs matrix.
-     */
-    fun apply(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
-        return permutationNetwork.apply(votes)
-    }
-
-
-    /**
-     * Processes a mix batch and returns the serialized components as a MixBatchOutput object.
-     *
-     * @param votes The list of votes to be mixed.
-     * @return A MixBatchOutput containing the header, ciphertexts matrix, and proofs matrix.
-     */
-    fun processMixBatch(votes: List<Vote>): MixBatchOutput {
-        // 1. Apply the mix
-        val (mixedVotes, ciphertextsMatrix, proofsMatrix) = apply(votes)
-
-        // 2. Create MixBatchHeader
+    private fun createMixBatchOutput(ciphertextsMatrix : List<List<Vote>>, proofsMatrix : List<List<Mixing.Mix2Proof>>): MixBatchOutput {
+        // Create MixBatchHeader
         val header = Mixing.MixBatchHeader.newBuilder()
             .setLogN((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
             .setLayers((2 * (Math.log(n.toDouble()) / Math.log(2.0)) - 1).toInt()) // 2 * (log_2(N)) -1
             .build()
 
-        // 3. Populate MixBatchOutput
+        // Populate MixBatchOutput
         return MixBatchOutput(
             header = header,
             ciphertextsMatrix = ciphertextsMatrix.map { layerVotes ->
@@ -106,5 +131,4 @@ class MixServer(
             proofsMatrix = proofsMatrix
         )
     }
-
 }
