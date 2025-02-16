@@ -36,7 +36,9 @@ fun main() {
     val publicKey = keyFactory.generatePublic(publicKeySpec)
     val privateKey = keyFactory.generatePrivate(privateKeySpec)
 
-//    bulletinBoard.sendPublicKey(publicKey, CryptoConfig.EC_CURVE_NAME)
+    bulletinBoard.sendPublicKey(publicKey, CryptoConfig.EC_CURVE_NAME)
+
+//    ElGamal.encrypt(publicKey, "1", domainParameters)
 
     val serversManager = MixServersManager(publicKey, domainParameters, 0, bulletinBoard)
 

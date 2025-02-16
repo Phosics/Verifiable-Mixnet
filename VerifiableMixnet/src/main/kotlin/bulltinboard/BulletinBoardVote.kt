@@ -27,11 +27,25 @@ data class BulletinBoardVotes (
         val mixnetVotes : MutableList<Vote> = mutableListOf()
 
         for (vote in votes) {
-            val decodedVote = Base64.getDecoder().decode(vote.choice.data)
-            mixnetVotes.add(Vote(RerandomizableEncryptedMessage.parseFrom(decodedVote)))
+            val bytes = hexStringToByteArray(vote.choice)
+            mixnetVotes.add(Vote(RerandomizableEncryptedMessage.parseFrom(bytes)))
         }
 
         return mixnetVotes
+    }
+
+    /**
+     * Converts a hex string to a ByteArray.
+     *
+     * @param hex The hex string to convert.
+     * @return The resulting ByteArray.
+     * @throws IllegalArgumentException If the hex string is invalid.
+     */
+    private fun hexStringToByteArray(hex: String): ByteArray {
+        require(hex.length % 2 == 0) { "Invalid hex string: length must be even." }
+        return ByteArray(hex.length / 2) { index ->
+            hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
     }
 }
 
@@ -41,13 +55,13 @@ data class BulletinBoardVote (
     val id: String,
 
     @SerialName("choice")
-    val choice: BulletinBoardData,
+    val choice: String,
 
     @SerialName("timestamp")
     val timestamp: String,
 
     @SerialName("signedChoice")
-    val signature: BulletinBoardData
+    val signature: String
 ) {
     fun verifySignature(publicKey : PublicKey) : Boolean {
         // TODO: Fill
