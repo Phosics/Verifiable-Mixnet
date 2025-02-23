@@ -1,9 +1,9 @@
 package mixnet
 
+import bulltinboard.BulletinBoard
 import kotlinx.coroutines.*
 import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.mixnet.BulletinBoard
 import java.security.PublicKey
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
@@ -18,7 +18,8 @@ class MixServersManager(
     private val publicKey: PublicKey,
     private val domainParameters: ECDomainParameters,
     private val t: Int,
-    private val bulletinBoard: BulletinBoard) {
+    private val bulletinBoard: BulletinBoard
+) {
     private val n = bulletinBoard.numberOfVotes
     private val numServers = 2 * t + 1
     private val logger = LogManager.getLogger(MixServersManager::class.java)

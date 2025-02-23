@@ -1,6 +1,7 @@
 package org.example.mixnet
 
 import meerkat.protobuf.Crypto
+import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing
 
 /**
@@ -90,6 +91,10 @@ data class MixBatchOutput(
             }
         }
         return true
+    }
+
+    fun getVotes() : List<Vote> {
+        return ciphertextsMatrix.map { it.last() }.map { Vote(it) }
     }
 
     /**

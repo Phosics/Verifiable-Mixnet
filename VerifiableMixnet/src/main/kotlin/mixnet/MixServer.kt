@@ -1,11 +1,12 @@
 package mixnet
 
+import bulltinboard.BulletinBoard
+import bulltinboard.TIMEOUT
 import kotlinx.coroutines.delay
 import meerkat.protobuf.Mixing
 import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
-import org.example.bulltinboard.BulletinBoardVote
 import org.example.mixnet.*
 import java.security.PublicKey
 import java.util.*
@@ -62,23 +63,17 @@ class MixServer(
 
     private fun getVotes(): List<Vote> {
         logger.info("Getting the starting votes...")
-        return bulletinBoard.votes
-//        val posts = bulletinBoard.read()
-//
-//        for (i in posts.indices) {
-//            logger.info("Verifying the votes publish row $i...")
-//            val tempBulletinBoardObject = posts[i]
-//
-//            if(!verifyBulletinBoardObject(tempBulletinBoardObject)) {
-//                logger.info("Verification Failed, skipping row.")
-//                continue
-//            }
-//
-//            logger.info("Verification Successful.")
-//            votes = tempBulletinBoardObject.getVotes()
-//        }
-//
-//        return votes
+        var currentVotes = bulletinBoard.votes
+        val mixBatches = bulletinBoard.getMixBatchOutputs()
+
+        for (mixBatch in mixBatches) {
+            logger.info("Verifying the votes published in mixBatch ${mixBatch.header}...")
+
+            // TODO: verify mixbatch
+            currentVotes = mixBatch.getVotes()
+        }
+
+        return currentVotes
     }
 
     private fun validatePublicKey(key: PublicKey) {

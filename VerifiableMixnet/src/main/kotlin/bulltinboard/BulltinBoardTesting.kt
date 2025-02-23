@@ -5,8 +5,9 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.example.crypto.CryptoConfig
 import org.example.crypto.ElGamal
-import org.example.mixnet.BulletinBoard
-import org.example.mixnet.TIMEOUT
+import bulltinboard.BulletinBoard
+import bulltinboard.TIMEOUT
+import meerkat.protobuf.Mixing.MixBatchHeader
 import java.security.KeyFactory
 import java.security.Security
 import java.security.spec.PKCS8EncodedKeySpec
@@ -46,7 +47,11 @@ fun main() {
         println("Vote: ${ElGamal.decrypt(privateKey, vote.getEncryptedMessage(), domainParameters)}")
     }
 
-//    serversManager.runServers()
-//
-//    Thread.sleep((1 * TIMEOUT + TIMEOUT).toLong())
+    serversManager.runServers()
+
+    Thread.sleep((1 * TIMEOUT + TIMEOUT).toLong())
+
+    val mixBatchOutputs = bulletinBoard.getMixBatchOutputs()
+
+    println(mixBatchOutputs.extract())
 }
