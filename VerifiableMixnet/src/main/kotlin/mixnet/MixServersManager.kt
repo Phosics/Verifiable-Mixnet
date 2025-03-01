@@ -1,10 +1,12 @@
 package mixnet
 
-import meerkat.protobuf.Mixing
+import bulltinboard.BulletinBoard
+import kotlinx.coroutines.*
+import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.mixnet.MixBatchOutput
-import org.example.mixnet.Vote
 import java.security.PublicKey
+import java.util.concurrent.Executors
+import java.util.concurrent.ThreadFactory
 
 /**
  * Manages multiple MixServer instances to imitate a mixnet.
@@ -16,48 +18,61 @@ class MixServersManager(
     private val publicKey: PublicKey,
     private val domainParameters: ECDomainParameters,
     private val t: Int,
-    private val n: Int
+    private val bulletinBoard: BulletinBoard
 ) {
+    private val n = bulletinBoard.numberOfVotes
     private val numServers = 2 * t + 1
+    private val logger = LogManager.getLogger(MixServersManager::class.java)
 
     private val mixServers: List<MixServer>
+    private val serverScopes: List<CoroutineScope>
 
     init {
-        require(t > 0) { "Number of adversaries t must be positive" }
+        require(t > -1) { "Number of adversaries t must be positive" }
         require(n > 0 && (n and (n - 1)) == 0) { "n must be a power of 2" }
 
         // Initialize 2t + 1 MixServer instances
         mixServers = List(numServers) { index ->
-            println("Initializing MixServer ${index + 1}/$numServers with n=$n")
-            MixServer(publicKey, domainParameters, n)
+            logger.info("Initializing MixServer ${index + 1}/$numServers with n=$n")
+            MixServer(publicKey, domainParameters, index)
+        }
+
+        // Create a CoroutineScope for each MixServer with a dedicated dispatcher
+        serverScopes = mixServers.map { mixServer ->
+            val threadName = "MixServer-${mixServer.getIndex() + 1}"
+            val dispatcher: CoroutineDispatcher = createSingleThreadDispatcher(threadName)
+            CoroutineScope(dispatcher)
+        }
+    }
+
+    fun getAmountOfServers() : Int {
+        return numServers
+    }
+
+    fun runServers() : List<Job> {
+        return mixServers.mapIndexed { index, mixServer ->
+            val scope = serverScopes[index]
+            scope.launch {
+                mixServer.run()
+            }
         }
     }
 
     /**
-     * Applies the mixnet to the given votes by passing them through each MixServer in sequence.
+     * Creates a single-threaded CoroutineDispatcher with a custom thread name.
      *
-     * @param votes The list of votes to be mixed. Size must be exactly n.
-     * @return A list of MixBatchOutput from each server.
+     * @param threadName The desired name for the thread.
+     * @return A CoroutineDispatcher backed by a single thread with the specified name.
      */
-    fun processMixBatch(votes: List<Vote>): List<MixBatchOutput> {
-        require(votes.size == n) {
-            "processMixBatch() requires exactly n=$n votes, but got ${votes.size}"
+    private fun createSingleThreadDispatcher(threadName: String): CoroutineDispatcher {
+        val threadFactory = object : ThreadFactory {
+            override fun newThread(r: Runnable): Thread {
+                return Thread(r, threadName).apply {
+                    isDaemon = true // Set to true if you want daemon threads
+                }
+            }
         }
-
-        var currentVotes = votes
-        val mixBatchOutputs = mutableListOf<MixBatchOutput>()
-
-        mixServers.forEachIndexed { index, server ->
-            server.configureRandomly()
-            println("Processing MixServer ${index + 1}/$numServers")
-            val mixBatchOutput = server.processMixBatch(currentVotes)
-            mixBatchOutputs.add(mixBatchOutput)
-            println("Completed MixServer ${index + 1}/$numServers")
-
-            // Update currentVotes with the mixed votes from the last column
-            currentVotes = mixBatchOutput.ciphertextsMatrix.map { Vote(it.last()) }
-        }
-
-        return mixBatchOutputs
+        val executor = Executors.newSingleThreadExecutor(threadFactory)
+        return executor.asCoroutineDispatcher()
     }
 }

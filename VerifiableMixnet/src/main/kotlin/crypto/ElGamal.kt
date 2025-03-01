@@ -16,6 +16,7 @@ import java.security.SecureRandom
 import java.security.spec.X509EncodedKeySpec
 import java.security.spec.PKCS8EncodedKeySpec
 import java.math.BigInteger
+import java.util.*
 
 /**
  * ElGamal provides encryption, decryption, and rerandomization functionalities using the EC-ElGamal scheme.
@@ -46,6 +47,7 @@ object ElGamal {
      * @param domainParameters The EC domain parameters.
      * @return A RerandomizableEncryptedMessage containing the ciphertext.
      */
+    @OptIn(ExperimentalStdlibApi::class)
     fun encrypt(
         publicKey: PublicKey,
         message: String,
@@ -68,26 +70,38 @@ object ElGamal {
         val qPoint: ECPoint = pubKey.q
 
         // Choose random k ∈ [1, n-1]
-        val k = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+//        val k = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        val k = BigInteger("74568746188548940538923052437055947213724268152111421578093693736749817181417")
+        println("k: $k")
 
         // Compute C1 = k * G
         val c1: ECPoint = domainParameters.g.multiply(k).normalize()
+        println("c1 x: ${c1.xCoord}")
+        println("c1 y: ${c1.yCoord}")
 
         // Compute C2 = M + k * Q
         val c2: ECPoint = messagePoint.add(qPoint.multiply(k)).normalize()
+        println("c2 x: ${c2.xCoord}")
+        println("c2 y: ${c2.yCoord}")
 
         // Serialize c1 and c2 into GroupElement Protobuf messages
         val serializedC1: GroupElement = CryptoUtils.serializeGroupElement(c1)
+        println("C1 Group Element: ${serializedC1.data.toByteArray().toHexString()}")
         val serializedC2: GroupElement = CryptoUtils.serializeGroupElement(c2)
+        println("C2 Group Element: ${serializedC2.data.toByteArray().toHexString()}")
 
         // Build ElGamalCiphertext using the builder pattern
         val elGamalCiphertext: ElGamalCiphertext = ElGamalCiphertext.newBuilder()
             .setC1(serializedC1)
             .setC2(serializedC2)
             .build()
+        println("ElGammal cipher text: ${elGamalCiphertext.toByteArray().toHexString()}")
 
         // Wrap into RerandomizableEncryptedMessage
-        return CryptoUtils.wrapCiphertext(elGamalCiphertext)
+        val result = CryptoUtils.wrapCiphertext(elGamalCiphertext)
+        println("Rerandomize... ${result.toByteArray().toHexString()}")
+
+        return result
     }
 
     /**

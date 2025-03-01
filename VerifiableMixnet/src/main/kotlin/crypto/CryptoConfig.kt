@@ -32,7 +32,7 @@ object CryptoConfig {
      * Max message length: 256 bits.
      * When using text messages, max text length: 31 Bytes + 1 Byte overhead
      */
-    private const val EC_CURVE_NAME = "secp256r1"
+    const val EC_CURVE_NAME = "secp256r1"
 
     /**
      * The domain parameters for the selected elliptic curve.

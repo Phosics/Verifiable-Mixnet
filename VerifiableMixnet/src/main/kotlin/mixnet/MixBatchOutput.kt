@@ -1,6 +1,7 @@
 package org.example.mixnet
 
 import meerkat.protobuf.Crypto
+import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing
 import org.bouncycastle.util.encoders.Hex.toHexString
 import java.io.OutputStream
