@@ -37,7 +37,7 @@ fun main() {
     val publicKey = keyFactory.generatePublic(publicKeySpec)
     val privateKey = keyFactory.generatePrivate(privateKeySpec)
 
-    bulletinBoard.sendPublicKey(publicKey, CryptoConfig.EC_CURVE_NAME)
+    bulletinBoard.sendPublicKey(publicKey)
 
 //    ElGamal.encrypt(publicKey, "1", domainParameters)
 
@@ -53,5 +53,5 @@ fun main() {
 
     val mixBatchOutputs = bulletinBoard.getMixBatchOutputs()
 
-    println(mixBatchOutputs.extract())
+    println(mixBatchOutputs)
 }

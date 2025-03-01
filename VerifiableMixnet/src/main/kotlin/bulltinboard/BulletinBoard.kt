@@ -59,8 +59,8 @@ class BulletinBoard {
         return sendGetRequest<BulletinBoardMixBatchOutputs>("$localhost/mixBatch").extract()
     }
 
-    fun sendPublicKey(publicKey: PublicKey, ecName: String) {
-        val payload = PublicKeyData(convertPublicKey(publicKey), ecName)
+    fun sendPublicKey(publicKey: PublicKey) {
+        val payload = PublicKeyData(convertPublicKey(publicKey))
 
         runBlocking {
             client.post("$localhost/crypto/public-key") {
