@@ -40,7 +40,7 @@ class MixServer(
             "n must be a power of 2."
         }
         validatePublicKey(publicKey)
-        permutationNetwork = PermutationNetwork(publicKey, domainParameters, n)
+        permutationNetwork = PermutationNetwork(publicKey, domainParameters, n, random)
     }
 
     fun getIndex() : Int {

@@ -60,7 +60,7 @@ data class BulletinBoardVote (
     @SerialName("timestamp")
     val timestamp: String,
 
-    @SerialName("signedChoice")
+    @SerialName("pollId")
     val signature: String
 ) {
     fun verifySignature(publicKey : PublicKey) : Boolean {

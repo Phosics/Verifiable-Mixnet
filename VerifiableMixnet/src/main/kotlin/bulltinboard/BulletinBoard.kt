@@ -14,6 +14,7 @@ import org.example.bulltinboard.PublicKeyData
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.Vote
 import java.security.PublicKey
+import java.security.interfaces.ECPublicKey
 import java.util.*
 import kotlin.math.ceil
 import kotlin.math.log2
@@ -23,8 +24,8 @@ const val TIMEOUT = 5000
 
 class BulletinBoard {
     val localhost = "http://localhost:3000/api"
-    val votes : List<Vote>
-    val numberOfVotes : Int
+    var numberOfVotes : Int = 0
+    var votes : List<Vote> = mutableListOf()
 
     val client : HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -32,7 +33,7 @@ class BulletinBoard {
         }
     }
 
-    init {
+    fun loadVotes() {
         votes = sendGetRequest<BulletinBoardVotes>("$localhost/votes").extractVotes()
         // TODO: verify
         // TODO: Browser should add dummy votes when finish voting
@@ -59,8 +60,23 @@ class BulletinBoard {
         return sendGetRequest<BulletinBoardMixBatchOutputs>("$localhost/mixBatch").extract()
     }
 
-    fun sendPublicKey(publicKey: PublicKey) {
-        val payload = PublicKeyData(convertPublicKey(publicKey))
+    fun sendPublicKey(publicKey: ECPublicKey) {
+//        val payload = PublicKeyData(convertPublicKey(publicKey))
+
+        val ecPoint = publicKey.w
+
+        // Convert X and Y coordinates to hexadecimal
+        val xHex = ecPoint.affineX.toString(16)
+        val yHex = ecPoint.affineY.toString(16)
+
+        println("X Orig: $xHex")
+        println("Y Orig: $yHex")
+
+        val publicKeyHex = ecPublicKeyToHex(publicKey)
+
+        println("PublicKey Hex: $publicKeyHex")
+
+        val payload = PublicKeyData(ecPublicKeyToHex(publicKey))
 
         runBlocking {
             client.post("$localhost/crypto/public-key") {
@@ -101,5 +117,24 @@ class BulletinBoard {
         }
 
         return result
+    }
+}
+
+fun ecPublicKeyToHex(publicKey: ECPublicKey, compressed: Boolean = false): String {
+    val ecPoint = publicKey.w
+    val x = ecPoint.affineX.toByteArray().dropWhile { it == 0.toByte() }.toByteArray()
+    val y = ecPoint.affineY.toByteArray().dropWhile { it == 0.toByte() }.toByteArray()
+
+    // Ensure 32-byte padding for secp256k1/secp256r1
+    val xPadded = ByteArray(32 - x.size) { 0 } + x
+    val yPadded = ByteArray(32 - y.size) { 0 } + y
+
+    return if (compressed) {
+        // Compressed format: 0x02 if y is even, 0x03 if y is odd
+        val prefix = if (yPadded.last().toInt() % 2 == 0) "02" else "03"
+        prefix + xPadded.joinToString("") { "%02x".format(it) }
+    } else {
+        // Uncompressed format: 0x04 + X + Y
+        "04" + xPadded.joinToString("") { "%02x".format(it) } + yPadded.joinToString("") { "%02x".format(it) }
     }
 }

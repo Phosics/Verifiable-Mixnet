@@ -105,4 +105,7 @@ data class MixBatchOutput(
         }
     }
 
+    fun getVotes() : List<Vote> {
+        return ciphertextsMatrix.map { it.last() }.map { Vote(it) }
+    }
 }

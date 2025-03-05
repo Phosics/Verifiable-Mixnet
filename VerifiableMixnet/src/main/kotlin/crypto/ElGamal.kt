@@ -70,9 +70,12 @@ object ElGamal {
         val qPoint: ECPoint = pubKey.q
 
         // Choose random k ∈ [1, n-1]
-//        val k = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
-        val k = BigInteger("74568746188548940538923052437055947213724268152111421578093693736749817181417")
+        val k = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+//        val k = BigInteger("85098657798640155475655463434994114077873568100739976688451492674567138052374", 10)
         println("k: $k")
+
+        println("q x: ${qPoint.xCoord}")
+        println("q x: ${qPoint.yCoord}")
 
         // Compute C1 = k * G
         val c1: ECPoint = domainParameters.g.multiply(k).normalize()
