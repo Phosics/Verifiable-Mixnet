@@ -9,6 +9,7 @@ import org.example.crypto.ElGamal
 import org.example.crypto.ThresholdCryptoConfig
 import java.security.KeyFactory
 import java.security.KeyPair
+import java.security.SecureRandom
 import java.security.Security
 import java.security.interfaces.ECPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
@@ -38,9 +39,9 @@ fun main() {
 //    val publicKey = keyFactory.generatePublic(publicKeySpec) as ECPublicKey
 //    val privateKey = keyFactory.generatePrivate(privateKeySpec)
 
-    val pair : KeyPair = CryptoConfig.generateKeyPair()
-    val publicKey = pair.public as ECPublicKey
-    val privateKey = pair.private
+//    val pair : KeyPair = CryptoConfig.generateKeyPair()
+//    val publicKey = pair.public as ECPublicKey
+//    val privateKey = pair.private
 
 //    val ecPoint = publicKey.w
 //
@@ -51,10 +52,10 @@ fun main() {
 //    println("Public Key X (Hex): $xHex")
 //    println("Public Key Y (Hex): $yHex")
 
-    val n = 1
-    val t = 1
+    val n = 6
+    val t = 10
 
-//    val (publicKey, thresholdServers) = ThresholdCryptoConfig.generateThresholdKeyPair(n, t, SecureRandom.getInstanceStrong())
+    val (publicKey, thresholdServers) = ThresholdCryptoConfig.generateThresholdKeyPair(n, t, SecureRandom.getInstanceStrong())
 
     bulletinBoard.sendPublicKey(publicKey)
 
@@ -63,27 +64,23 @@ fun main() {
     println("Waiting...")
     Thread.sleep(1 * 20 * 1000)
 
-    println("Java")
-    val encryptedMessage = ElGamal.encrypt(publicKey, "1", domainParameters)
-    println("Vote: ${ElGamal.decrypt(privateKey, encryptedMessage, domainParameters)}")
-
     println("JavaScript:")
     bulletinBoard.loadVotes()
 
-//    val serversManager = MixServersManager(publicKey, domainParameters, 0, bulletinBoard)
-
-//    val decryptionServers = thresholdServers.shuffled().take(t)
-//    println(decryptionServers.size)
-
-//    for(vote in bulletinBoard.votes) {
-//        println("Vote: ${ThresholdCryptoConfig.thresholdDecrypt(vote.getEncryptedMessage(), decryptionServers).message}")
-//    }
-
-//    val mixBatchOutputs = bulletinBoard.getMixBatchOutputs()
+    val decryptionServers = thresholdServers.shuffled().take(t)
+    println(decryptionServers.size)
 
     for(vote in bulletinBoard.votes) {
-        println("Vote: ${ElGamal.decrypt(privateKey, vote.getEncryptedMessage(), domainParameters)}")
+        println("Vote: ${ThresholdCryptoConfig.thresholdDecrypt(vote.getEncryptedMessage(), decryptionServers).message}")
     }
+
+    //    val serversManager = MixServersManager(publicKey, domainParameters, 0, bulletinBoard)
+
+    //    val mixBatchOutputs = bulletinBoard.getMixBatchOutputs()
+
+//    for(vote in bulletinBoard.votes) {
+//        println("Vote: ${ElGamal.decrypt(privateKey, vote.getEncryptedMessage(), domainParameters)}")
+//    }
 
 //
 //    serversManager.runServers()

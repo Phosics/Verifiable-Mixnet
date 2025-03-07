@@ -14,6 +14,7 @@ import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.PublicKey
 import java.security.SecureRandom
+import java.security.interfaces.ECPublicKey
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -55,11 +56,11 @@ object ThresholdCryptoConfig {
     /**
      * Converts an ECPoint to a PublicKey.
      */
-    fun ecPointToPublicKey(point: ECPoint): PublicKey {
+    fun ecPointToPublicKey(point: ECPoint): ECPublicKey {
         val ecSpec = ECNamedCurveTable.getParameterSpec(EC_CURVE_NAME)
         val pubSpec = org.bouncycastle.jce.spec.ECPublicKeySpec(point, ecSpec)
         val keyFactory = KeyFactory.getInstance("EC", "BC")
-        return keyFactory.generatePublic(pubSpec)
+        return keyFactory.generatePublic(pubSpec) as ECPublicKey
     }
 
     // --- Internal classes and helper methods for share distribution and decryption ---
@@ -235,7 +236,7 @@ object ThresholdCryptoConfig {
      * @param random A SecureRandom instance provided by the caller.
      * @return Pair of overall PublicKey and list of ThresholdServer instances.
      */
-    fun generateThresholdKeyPair(n: Int, t: Int, random: SecureRandom): Pair<PublicKey, List<ThresholdServer>> {
+    fun generateThresholdKeyPair(n: Int, t: Int, random: SecureRandom): Pair<ECPublicKey, List<ThresholdServer>> {
         // Create inter-thread communication channels (one BlockingQueue per server).
         val commMap: Map<Int, BlockingQueue<ShareMessage>> =
             (1..n).associateWith { LinkedBlockingQueue<ShareMessage>() }
