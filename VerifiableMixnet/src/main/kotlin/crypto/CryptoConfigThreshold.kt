@@ -79,7 +79,7 @@ object ThresholdCryptoConfig {
     class ThresholdServer(
         private val id: Int,           // Server identifier (1-indexed)
         private val n: Int,            // Total number of servers
-        private val t: Int,            // Threshold value
+        val t: Int,            // Threshold value
         private val commMap: Map<Int, BlockingQueue<ShareMessage>>,
         private val random: SecureRandom // Provided random instance
     ) : Runnable {
@@ -100,6 +100,10 @@ object ThresholdCryptoConfig {
         internal var secretShare: BigInteger? = null
             private set
 
+        // This will be set after we compute the secretShare.
+        var partialPublicKey: ECPoint? = null
+            private set
+
         override fun run() {
             // Send each share to its destination.
             outgoingShares?.forEach { (destId, share) ->
@@ -117,6 +121,9 @@ object ThresholdCryptoConfig {
             }
             // Compute secret share: S = sum(receivedShares) mod order.
             secretShare = receivedShares.fold(BigInteger.ZERO) { acc, s -> acc.add(s).mod(order) }
+
+            // Now set partialPublicKey = g^{s_i}
+            partialPublicKey = ecDomainParameters.g.multiply(secretShare).normalize()
         }
 
         /**
@@ -130,9 +137,9 @@ object ThresholdCryptoConfig {
         /**
          * Returns the partial public key: h_i = g^{s_i}.
          */
-        fun getPartialPublicKey(): ECPoint {
-            val s = secretShare ?: throw IllegalStateException("Secret share not computed for server $id")
-            return ecDomainParameters.g.multiply(s).normalize()
+        fun getPartialPublickey(): ECPoint {
+            return partialPublicKey
+                ?: throw IllegalStateException("Partial public key not initialized for server $id")
         }
 
         fun getId(): Int = id
@@ -149,7 +156,7 @@ object ThresholdCryptoConfig {
         fun generateDecryptionProof(c1: ECPoint): SchnorrProofDL {
             val s = secretShare ?: throw IllegalStateException("Secret share not computed for server $id")
             // h_i = g^{s_i} (server's public share)
-            val h_i = getPartialPublicKey()
+            val h_i = getPartialPublickey()
             // Convert c1 to a PublicKey so that commitRealSubProof uses c1 as the second base.
             val c1AsPublicKey = ecPointToPublicKey(c1)
             // Commit: choose a random t and compute commitments.
@@ -257,7 +264,7 @@ object ThresholdCryptoConfig {
         servers.forEach { server ->
             val coeff = lagrangeCoefficient(server.getId(), indices, ecDomainParameters.n)
             overallPublicKeyPoint =
-                overallPublicKeyPoint.add(server.getPartialPublicKey().multiply(coeff)).normalize()
+                overallPublicKeyPoint.add(server.getPartialPublickey().multiply(coeff)).normalize()
         }
         return Pair(ecPointToPublicKey(overallPublicKeyPoint), servers)
     }
@@ -272,6 +279,8 @@ object ThresholdCryptoConfig {
      *
      * In addition, for each participating server a Schnorr proof is generated showing that
      * the decryption share was computed correctly.
+     * We also verify each proof before combining partial decryptions.
+     *
      *
      * @param encryptedMessage The ciphertext.
      * @param participatingServers The list of servers (must be at least t in number) participating in decryption.
@@ -285,17 +294,88 @@ object ThresholdCryptoConfig {
         val c1 = CryptoUtils.deserializeGroupElement(ciphertext.c1, ecDomainParameters)
         val c2 = CryptoUtils.deserializeGroupElement(ciphertext.c2, ecDomainParameters)
 
-        // Each participating server computes its partial decryption.
-        val partialDecryptions = participatingServers.map { server ->
-            Pair(server.getId(), server.computePartialDecryption(c1))
+        // Each participating server computes partial decryption + proof
+        val partialsWithProofs = participatingServers.map { server ->
+            val d_i = server.computePartialDecryption(c1)
+            val proof_i = server.generateDecryptionProof(c1)
+            // Verify the proof immediately
+            val partialPubKey = server.partialPublicKey
+                ?: throw IllegalStateException("No partial public key for server ${server.getId()}")
+
+            val isValid = verifyDecryptionProof(partialPubKey, c1, d_i, proof_i)
+            // Return everything in a single triple
+            Triple(server.getId(), d_i, if (isValid) proof_i else null)
         }
+
+        // Filter out any partials whose proof failed
+        val validPartials = partialsWithProofs.filter { it.third != null }
+
+        // If not enough partials are valid, we can't decrypt fully
+        if (validPartials.size < participatingServers[0].t) {
+            throw IllegalStateException("Not enough valid partial decryptions to meet threshold.")
+        }
+
+        // Combine only valid partial decryptions
+        val partialDecryptions = validPartials.map { Pair(it.first, it.second) }
         val decryptionFactor = combinePartialDecryptions(partialDecryptions, ecDomainParameters)
         val mPoint = c2.subtract(decryptionFactor).normalize()
         val message = MessageUtils.decodeECPointToMessage(mPoint)
-        // Generate proofs for each participating server.
-        val proofs = participatingServers.map { server ->
-            Pair(server.getId(), server.generateDecryptionProof(c1))
+
+        // For the final result, collect only the proofs that were valid
+        val finalProofs = validPartials.map { Pair(it.first, it.third!!) }
+
+        return ThresholdDecryptionResult(message, finalProofs)
+    }
+
+    fun verifyDecryptionProof(
+        partialPublicKey: ECPoint,
+        c1: ECPoint,
+        d_i: ECPoint,
+        proof: SchnorrProofDL
+    ): Boolean {
+        // Rebuild the challenge from the same info used in generateDecryptionProof
+        val baos = java.io.ByteArrayOutputStream()
+
+        // The commit points A_g, A_h are in proof.A_g, proof.A_h
+        baos.write(proof.A_g.data.toByteArray())
+        baos.write(proof.A_h.data.toByteArray())
+
+        // partialPublicKey is h_i, d_i is c1^{s_i}
+        baos.write(CryptoUtils.serializeGroupElement(partialPublicKey).data.toByteArray())
+        baos.write(CryptoUtils.serializeGroupElement(d_i).data.toByteArray())
+
+        val challenge = CryptoUtils.hashToBigInteger(baos.toByteArray())
+
+        // Now check the Schnorr conditions:
+        // For the "g" base:
+        //   G^z == A_g + h_i^challenge
+        // For the "c1" base:
+        //   c1^z == A_h + d_i^challenge
+        // We'll do something similar to how finalize is checked.
+
+        // We'll create the left and right sides for each base.
+        val z = proof.z
+
+        // Left side for base G
+        val lhsG = ecDomainParameters.g.multiply(z).normalize()
+        // Right side for base G
+        val A_gPoint = CryptoUtils.deserializeGroupElement(proof.A_g, ecDomainParameters)
+        val rightG = A_gPoint.add(partialPublicKey.multiply(challenge)).normalize()
+
+        if (!lhsG.equals(rightG)) {
+            return false
         }
-        return ThresholdDecryptionResult(message, proofs)
+
+        // Left side for base c1
+        val lhsC1 = c1.multiply(z).normalize()
+        // Right side for base c1
+        val A_hPoint = CryptoUtils.deserializeGroupElement(proof.A_h, ecDomainParameters)
+        val rightC1 = A_hPoint.add(d_i.multiply(challenge)).normalize()
+
+        if (!lhsC1.equals(rightC1)) {
+            return false
+        }
+
+        return true
     }
 }

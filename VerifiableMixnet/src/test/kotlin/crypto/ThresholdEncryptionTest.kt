@@ -14,6 +14,7 @@ import org.example.mixnet.Verifier
 import java.security.SecureRandom
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 // Extension function: returns all subsets of size k from a list.
 private fun <T> List<T>.combinations(k: Int): List<List<T>> {
@@ -103,13 +104,14 @@ class ThresholdCryptoConfigTest {
                     println("Subset $subsetIds --> Decrypted Message: $decrypted")
                     println("Subset $subsetIds --> All ZKP proofs verified for this subset!")
                 }
+                // The decryption should be correct for a valid t-subset.
                 assertEquals(message, decrypted, "Decryption failed for subset IDs: $subsetIds, message: '$message'")
 
                 // Verify each decryption proof using the Verifier.
                 decryptionResult.proofs.forEach { (serverId, proof) ->
                     // Find the corresponding server in the subset.
                     val server = subset.first { it.getId() == serverId }
-                    val h_i = server.getPartialPublicKey()
+                    val h_i = server.getPartialPublickey()   // FIXED name
                     val d_i = server.computePartialDecryption(c1)
                     val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
                     val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
@@ -151,7 +153,8 @@ class ThresholdCryptoConfigTest {
             println("-----------------------------------------------------")
             println("Original Message: $message")
             val encryptedMessage = ElGamal.encrypt(overallPublicKey, message, domainParameters)
-            // Reconstruct c1.
+
+            // We'll parse out c1 just so we can verify partial proofs.
             val ciphertext = CryptoUtils.unwrapCiphertext(encryptedMessage)
             val c1 = CryptoUtils.deserializeGroupElement(ciphertext.c1, domainParameters)
             val c1Serialized = CryptoUtils.serializeGroupElement(c1)
@@ -159,31 +162,44 @@ class ThresholdCryptoConfigTest {
             insufficientSubsets.forEach { subset ->
                 printCounter++
                 val subsetIds = subset.map { it.getId() }
-                val decryptionResult = ThresholdCryptoConfig.thresholdDecrypt(encryptedMessage, subset)
-                var decrypted = decryptionResult.message
-                // Truncate the decrypted message after 10 characters.
-                if (decrypted.length > 10) {
-                    decrypted = decrypted.substring(0, 10) + "..."
-                }
-                if (printCounter % 50 == 0) {
-                    println("Subset $subsetIds --> Decrypted Message (truncated): $decrypted")
-                    println("Subset $subsetIds --> All ZKP proofs verified for this insufficient subset!")
-                }
-                // With insufficient servers, decryption should be incorrect.
-                assertNotEquals(message, decryptionResult.message, "Insufficient decryption unexpectedly succeeded for subset IDs: $subsetIds, message: '$message'")
-                // Verify individual proofs.
-                decryptionResult.proofs.forEach { (serverId, proof) ->
-                    val server = subset.first { it.getId() == serverId }
-                    val h_i = server.getPartialPublicKey()
-                    val d_i = server.computePartialDecryption(c1)
-                    val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
-                    val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                    val proofOk = verifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
-                    assertTrue(proofOk, "Proof verification failed for server $serverId in insufficient subset $subsetIds")
+
+                // Attempt a full threshold decrypt (which should fail).
+                try {
+                    val decryptionResult = ThresholdCryptoConfig.thresholdDecrypt(encryptedMessage, subset)
+                    // If we got here, it means thresholdDecrypt didn't fail, which is unexpected.
+                    // We assert a failure because we only have t-1 shares.
+                    fail("Insufficient subset $subsetIds unexpectedly succeeded in decrypting.")
+                } catch (e: IllegalStateException) {
+                    // We expect an exception about "Not enough valid partial decryptions"
+                    if (e.message?.contains("Not enough valid partial decryptions") == true) {
+                        // This is good. Now let's confirm each server's partial proof is individually correct.
+                        subset.forEach { server ->
+                            val d_i = server.computePartialDecryption(c1)
+                            val proof = server.generateDecryptionProof(c1)
+
+                            // We'll verify the partial proof using the Verifier.
+                            val h_i = server.getPartialPublickey()
+                            val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
+                            val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
+                            val proofOk = verifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
+                            assertTrue(
+                                proofOk,
+                                "Partial proof verification failed for server ${server.getId()} in insufficient subset $subsetIds"
+                            )
+                        }
+
+                        if (printCounter % 50 == 0) {
+                            println("Subset $subsetIds --> All partial ZKP proofs verified (as expected, final decrypt is impossible).")
+                        }
+                    } else {
+                        // Some other error? Rethrow it.
+                        throw e
+                    }
                 }
             }
-            println("✅ Message '$message' was NOT correctly decrypted with insufficient servers. All individual ZKP proofs verified! 🔒\n")
+            println("✅ Message '$message' was NOT fully decrypted with insufficient servers, but all partial proofs are valid!\n")
         }
-        println("🎉 Insufficient-server tests completed successfully for parameters (n=$n, t=$t)! All ZKP proofs verified! 🔐\n")
+        println("🎉 Insufficient-server tests completed successfully for parameters (n=$n, t=$t)! All partial ZKP proofs verified! 🔐\n")
     }
+
 }
