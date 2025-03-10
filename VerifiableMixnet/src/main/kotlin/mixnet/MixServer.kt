@@ -1,11 +1,14 @@
 package mixnet
 
+import Ed25519Utils
 import bulltinboard.BulletinBoard
 import bulltinboard.TIMEOUT
 import kotlinx.coroutines.delay
 import meerkat.protobuf.Mixing
 import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.example.mixnet.*
 import java.security.PublicKey
@@ -23,17 +26,13 @@ class MixServer(
     private val bulletinBoard : BulletinBoard = BulletinBoard()
     private val n : Int = bulletinBoard.numberOfVotes
 
-    /**
-     * Creation:
-     * Inputs:
-     * 1.   Amount of votes to be mixed (should be 2^n)
-     * 2.   Create a matrix of Switch objects: columns - 2 * log(n)_2 - 1, rows - n / 2
-     * 3.   Create a random permutation of the n votes
-     * 4.   Run the algorithm of the shuffle to fix the switches
-     */
     private val random = SecureRandom.getInstanceStrong()
     private val permutationNetwork : PermutationNetwork
     private val logger = LogManager.getLogger(MixServer::class.java)
+
+    // Ed25519 Key Pair for this server
+    private val ed25519PrivateKey: Ed25519PrivateKeyParameters // private
+    val ed25519PublicKey: Ed25519PublicKeyParameters           // public
 
     init {
         require(n > 0 && (n and (n - 1)) == 0) {
@@ -41,6 +40,14 @@ class MixServer(
         }
         validatePublicKey(publicKey)
         permutationNetwork = PermutationNetwork(publicKey, domainParameters, n, random)
+
+        // Generate Ed25519 key pair for signing
+        // 32 random bytes for the private key
+        val privateKeyBytes = ByteArray(32)
+        random.nextBytes(privateKeyBytes)
+        ed25519PrivateKey = Ed25519PrivateKeyParameters(privateKeyBytes, 0)
+        ed25519PublicKey = ed25519PrivateKey.generatePublicKey()
+        logger.info("MixServer #$index generated its Ed25519 key pair.")
     }
 
     fun getIndex() : Int {
@@ -57,7 +64,15 @@ class MixServer(
 
         val (mixedVotes, ciphertextsMatrix, proofsMatrix) = permutationNetwork.apply(getVotes())
 
-        bulletinBoard.sendMixBatchOutput(createMixBatchOutput(ciphertextsMatrix, proofsMatrix))
+        // Build MixBatchOutput
+        val unsignedBatch = createMixBatchOutput(ciphertextsMatrix, proofsMatrix)
+
+        //  Sign the MixBatchOutput with this server's Ed25519 private key
+        val signedBatch = Ed25519Utils.signMixBatchOutput(unsignedBatch, ed25519PrivateKey)
+
+        // TODO: publish the signed batch to the bulletin board
+
+        bulletinBoard.sendMixBatchOutput(signedBatch)
 
         logger.info("Published votes and proofs.")
     }

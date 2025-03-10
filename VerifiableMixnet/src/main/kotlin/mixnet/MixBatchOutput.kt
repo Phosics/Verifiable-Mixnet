@@ -19,12 +19,14 @@ data class MixBatchOutput(
         .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
         .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
         .setLocation(Mixing.Mix2Proof.Location.newBuilder()
-            .setLayer(0)        // Example value; set appropriately
-            .setSwitchIdx(0)    // Example value; set appropriately
-            .setOut0(0)         // Example value; set appropriately
-            .setOut1(1)         // Example value; set appropriately
+            .setLayer(0)        // Example value
+            .setSwitchIdx(0)    // Example value
+            .setOut0(0)         // Example value
+            .setOut1(1)         // Example value
             .build())
-        .build()
+        .build(),
+
+    val signatureEd25519: ByteArray? = null
 ) {
     override fun toString(): String {
         val sb = StringBuilder()
@@ -69,6 +71,12 @@ data class MixBatchOutput(
                     if (proofHex.length > 8) "${proofHex.substring(0, 16)}..." else proofHex
                 sb.append("      Row ${colIdx + 1}: $truncatedHex\n")
             }
+        }
+
+        // Display the Ed25519 signature (if present)
+        if (signatureEd25519 != null) {
+            val sigHex = signatureEd25519.joinToString("") { "%02x".format(it) }
+            sb.append("  Ed25519 Signature: $sigHex\n")
         }
 
         return sb.toString()
