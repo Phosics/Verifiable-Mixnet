@@ -65,7 +65,7 @@ class MixServer(
         val (mixedVotes, ciphertextsMatrix, proofsMatrix) = permutationNetwork.apply(getVotes())
 
         // Build MixBatchOutput
-        val unsignedBatch = createMixBatchOutput(ciphertextsMatrix, proofsMatrix)
+        val unsignedBatch = createMixBatchOutput(ciphertextsMatrix, proofsMatrix, ed25519PublicKey)
 
         //  Sign the MixBatchOutput with this server's Ed25519 private key
         val signedBatch = Ed25519Utils.signMixBatchOutput(unsignedBatch, ed25519PrivateKey)
@@ -126,7 +126,7 @@ class MixServer(
         permutationNetwork.configNetBySigma(sigma)
     }
 
-    private fun createMixBatchOutput(ciphertextsMatrix : List<List<Vote>>, proofsMatrix : List<List<Mixing.Mix2Proof>>): MixBatchOutput {
+    private fun createMixBatchOutput(ciphertextsMatrix : List<List<Vote>>, proofsMatrix : List<List<Mixing.Mix2Proof>>, ed25519PublicKey: Ed25519PublicKeyParameters): MixBatchOutput {
         // Create MixBatchHeader
         val header = Mixing.MixBatchHeader.newBuilder()
             .setLogN((Math.log(n.toDouble()) / Math.log(2.0)).toInt())
@@ -139,7 +139,8 @@ class MixServer(
             ciphertextsMatrix = ciphertextsMatrix.map { layerVotes ->
                 layerVotes.map { it.getEncryptedMessage() }
             },
-            proofsMatrix = proofsMatrix
+            proofsMatrix = proofsMatrix,
+            ed25519PublicKey = ed25519PublicKey
         )
     }
 }

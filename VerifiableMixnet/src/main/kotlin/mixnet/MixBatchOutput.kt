@@ -5,6 +5,9 @@ import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing
 import org.bouncycastle.util.encoders.Hex.toHexString
 import java.io.OutputStream
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+
 
 /**
  * Encapsulates the serialized output of a mix batch.
@@ -26,7 +29,8 @@ data class MixBatchOutput(
             .build())
         .build(),
 
-    val signatureEd25519: ByteArray? = null
+    val signatureEd25519: ByteArray? = null,
+    val ed25519PublicKey : Ed25519PublicKeyParameters? = null
 ) {
     override fun toString(): String {
         val sb = StringBuilder()
@@ -77,6 +81,12 @@ data class MixBatchOutput(
         if (signatureEd25519 != null) {
             val sigHex = signatureEd25519.joinToString("") { "%02x".format(it) }
             sb.append("  Ed25519 Signature: $sigHex\n")
+        }
+
+        // Display the Ed25519 public key (if present)
+        if (ed25519PublicKey != null) {
+            val pubKeyHex = ed25519PublicKey.encoded.joinToString("") { "%02x".format(it) }
+            sb.append("  Ed25519 Public: $pubKeyHex\n")
         }
 
         return sb.toString()
