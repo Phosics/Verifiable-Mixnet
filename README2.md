@@ -171,7 +171,6 @@ https://www.postman.com/supply-astronomer-70090851/workspace/mixnet/collection/2
 
 ## PRESENTATION
 
-For an updated overview of the project, refer to the Presentation.pdf file provided. 
----
+For an updated overview of the project, refer to the Presentation.pdf file provided.
 
 Happy voting and secure elections!
