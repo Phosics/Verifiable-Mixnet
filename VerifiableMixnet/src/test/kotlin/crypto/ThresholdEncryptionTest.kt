@@ -10,9 +10,8 @@ import org.example.crypto.CryptoConfig
 import org.example.crypto.CryptoUtils
 import org.example.crypto.ElGamal
 import org.example.crypto.ThresholdCryptoConfig
-import org.example.mixnet.Verifier
+import org.example.mixnet.MixBatchOutputVerifier
 import java.security.SecureRandom
-import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -76,7 +75,7 @@ class ThresholdCryptoConfigTest {
         println("🔑 Overall Public Key generated successfully for parameters: n=$n, t=$t.\n")
 
         // Create a Verifier instance (from the mixnet package) using domainParameters and overallPublicKey.
-        val verifier = Verifier(domainParameters, overallPublicKey)
+        val mixBatchOutputVerifier = MixBatchOutputVerifier(domainParameters, overallPublicKey)
 
         // Generate 16 random messages.
         val messages = List(messageCount) { randomMessage(10) }
@@ -115,7 +114,7 @@ class ThresholdCryptoConfigTest {
                     val d_i = server.computePartialDecryption(c1)
                     val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
                     val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                    val proofOk = verifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
+                    val proofOk = mixBatchOutputVerifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
                     assertTrue(proofOk, "Proof verification failed for server $serverId in subset $subsetIds")
                 }
             }
@@ -141,7 +140,7 @@ class ThresholdCryptoConfigTest {
         println("🔑 Overall Public Key generated for insufficient-server test with parameters: n=$n, t=$t.\n")
 
         // Create a Verifier instance.
-        val verifier = Verifier(domainParameters, overallPublicKey)
+        val mixBatchOutputVerifier = MixBatchOutputVerifier(domainParameters, overallPublicKey)
 
         val messages = List(messageCount) { randomMessage(10) }
         // Get all combinations of (t - 1) servers.
@@ -181,7 +180,7 @@ class ThresholdCryptoConfigTest {
                             val h_i = server.getPartialPublickey()
                             val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
                             val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                            val proofOk = verifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
+                            val proofOk = mixBatchOutputVerifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
                             assertTrue(
                                 proofOk,
                                 "Partial proof verification failed for server ${server.getId()} in insufficient subset $subsetIds"

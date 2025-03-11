@@ -1,18 +1,5 @@
 package org.example
 
-import meerkat.protobuf.Mixing
-import mixnet.MixServersManager
-import org.example.mixnet.Vote
-import org.bouncycastle.crypto.params.ECDomainParameters
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.example.crypto.CryptoConfig
-import org.example.crypto.ElGamal
-import org.example.mixnet.MixBatchOutput
-import org.example.mixnet.Verifier
-import java.security.KeyPair
-import java.security.PublicKey
-import java.security.Security
-
 fun main() {
     // Register Bouncy Castle as a security provider
 //    Security.addProvider(BouncyCastleProvider())

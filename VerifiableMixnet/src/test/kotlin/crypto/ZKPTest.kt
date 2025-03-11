@@ -8,7 +8,7 @@ import org.example.crypto.CryptoConfig
 import org.example.crypto.CryptoUtils
 import org.example.crypto.ElGamal
 import org.example.mixnet.Switch
-import org.example.mixnet.Verifier
+import org.example.mixnet.MixBatchOutputVerifier
 import org.example.mixnet.Vote
 import org.example.mixnet.ZKPUtils
 import java.security.SecureRandom
@@ -65,7 +65,7 @@ class ZKPTest {
             val dCiphertext = CryptoUtils.unwrapCiphertext(newVotes[1].getEncryptedMessage())
 
             // Verify the OR-proof.
-            val ok = Verifier(domainParameters, publicKey).verifySingleOrProof(
+            val ok = MixBatchOutputVerifier(domainParameters, publicKey).verifySingleOrProof(
                 ZKPUtils.serializeZKP(orProof),
                 aCiphertext.c1, aCiphertext.c2,
                 bCiphertext.c1, bCiphertext.c2,

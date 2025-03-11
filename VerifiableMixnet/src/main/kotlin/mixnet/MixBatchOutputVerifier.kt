@@ -17,7 +17,7 @@ import java.security.PublicKey
  * checks that the branch challenges sum to the global challenge,
  * and then verifies each branch using the provided branch challenge.
  */
-class Verifier(
+class MixBatchOutputVerifier(
     private val domainParameters: ECDomainParameters,
     private val publicKey: PublicKey
 ) {
