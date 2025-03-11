@@ -1,18 +1,9 @@
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
-import meerkat.protobuf.Mixing.Mix2Proof
-import org.bouncycastle.asn1.x9.DomainParameters
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
-import org.bouncycastle.crypto.signers.Ed25519Signer
-import org.bouncycastle.math.ec.ECPoint
-import org.example.crypto.CryptoConfig
-import org.example.crypto.ThresholdCryptoConfig.thresholdDecrypt
-import org.example.crypto.ThresholdCryptoConfig.verifyDecryptionProof
 import org.example.crypto.ThresholdDecryptionResult
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.MixBatchOutputVerifier
-import org.example.mixnet.SchnorrProofDL
-import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.PublicKey
 
