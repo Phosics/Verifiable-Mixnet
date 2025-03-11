@@ -28,7 +28,6 @@ class Verifier() {
         return computedHash.joinToString("") { "%02x".format(it) }
     }
 
-
     /**
      * Test 2: Verifies that the Bulletin Board's general parameters block is authentic.
      *
