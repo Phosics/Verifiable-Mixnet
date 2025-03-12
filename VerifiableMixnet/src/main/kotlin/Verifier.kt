@@ -21,9 +21,9 @@ class Verifier() {
      * @param bbPublicKey The Bulletin Board's public key.
      * @return A hexadecimal string representing the hash.
      */
-    fun test1_GenerateBBKeyHash(bbPublicKey: PublicKey): String {
+    fun test1_GenerateBBKeyHash(bbPublicKey: String): String {
         val md = MessageDigest.getInstance("SHA-256")
-        val keyBytes = bbPublicKey.encoded
+        val keyBytes = bbPublicKey.toByteArray()
         val computedHash = md.digest(keyBytes)
         return computedHash.joinToString("") { "%02x".format(it) }
     }

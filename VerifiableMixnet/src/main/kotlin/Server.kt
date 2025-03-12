@@ -75,6 +75,42 @@ class Server {
 
             // TODO: run verifier on everyting, send the result of the verifier
 
+            logger.info("Running verifier...")
+
+            val verifier = Verifier()
+
+            // test1: Computes the SHA-256 hash of the Bulletin Board's public key.
+            val BBKeyHash = verifier.test1_GenerateBBKeyHash(config.publicKey)
+
+            // test2: Verifies that the Bulletin Board's general parameters block is authentic.
+            val test2Result = verifier.test2_VerifyBBParametersSignature(bulletinboard.getParametersData(), bulletinboard.getSignature(), bulletinboard.getPublicKey())
+
+            // test3: Verifies that each mix batch output is produced by an authorized mix server.
+            val test3Result = verifier.test3_VerifyMixersAuthorization(config.mixServersPublicKeys, serversManager.getMixBatchOutputs())
+
+            // test4: Verifies that the signed encrypted vote list is authentic.
+            val test4Result = verifier.test4_VerifyEncryptedVoteListSignature(bulletinboard.getVoteListData(), bulletinboard.getVoteListSignature(), bulletinboard.getPublicKey())
+
+            // test5: Verifies that each mix batch output is correctly signed.
+            val test5Result = verifier.test5_VerifyMixBatchOutputSignature(serversManager.getMixBatchOutputs(), config.mixServersPublicKeys)
+
+            // test6: Verifies that the first mixer's input equals the signed encrypted vote list.
+            val test6Result = verifier.test6_VerifyFirstMixerInput(serversManager.getMixBatchOutputs(), bulletinboard.getVoteListData())
+
+            // test7: Verifies the mixing chain consistency across all mix batches.
+            val test7Result = verifier.test7_VerifyMixingChain(bulletinboard.getMixBatchOutputs(pollID))
+
+            // test8: Verifies the Zero-Knowledge Proofs (ZKPs) of the mixing process.
+            val test8Result = verifier.test8_VerifyMixersZKP(serversManager.getMixBatchOutputs(), domainParameters, publicKey)
+
+            // test9: Verifies the Zero-Knowledge Proofs for the decryption process.
+            val test9Result = verifier.test9_VerifyDecryptionZKP()
+
+            // test10: Summarizes the final decrypted votes.
+            val test10Result = verifier.test10_SummarizeDecryptedVotes(thresholdResults)
+
+
+
             val results = thresholdResults.map { it.message }.groupingBy { it }.eachCount()
 
             // TODO: send results - only if verifier is ok
