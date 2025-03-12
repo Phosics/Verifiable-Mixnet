@@ -2,14 +2,10 @@
 //
 //import meerkat.protobuf.Crypto
 //import meerkat.protobuf.Mixing
-//import org.bouncycastle.asn1.x9.DomainParameters
 //import org.bouncycastle.crypto.params.ECDomainParameters
 //import org.bouncycastle.jce.provider.BouncyCastleProvider
 //import crypto.CryptoConfig
 //import crypto.ElGamal
-//import mixnet.Vote
-//import mixnet.MixBatchOutput
-//import org.example.mixnet.Verifier
 //import java.security.KeyPair
 //import java.security.PublicKey
 //import java.security.Security
@@ -260,7 +256,7 @@
 //
 //        // 3) Verify the proofs’ signatures (or correctness) using your existing method
 //        println("\n=== Verifying proof signatures ===")
-//        val proofsValid = Verifier(domainParameters, publicKey).verifyMixBatchOutput(mixBatchOutput)
+//        val proofsValid = MixBatchOutputVerifier(domainParameters, publicKey).verifyMixBatchOutput(mixBatchOutput)
 //        if (proofsValid) {
 //            println("✅ All proofs pass signature verification.")
 //        } else {

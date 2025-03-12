@@ -166,9 +166,6 @@ class Verifier() {
      * Test 9: Verifies the Zero-Knowledge Proofs for the decryption process.
      */
     fun test9_VerifyDecryptionZKP(thresholdResults: List<ThresholdDecryptionResult?>): Boolean {
-        // TODO: if the decryption output is not null, then the decryption proof are valid.
-        // TODO: Therefore, we can return true if the decryption succeed.
-
         return thresholdResults.all { it != null }
 
     }

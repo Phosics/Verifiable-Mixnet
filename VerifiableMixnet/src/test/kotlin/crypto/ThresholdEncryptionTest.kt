@@ -97,7 +97,7 @@ class ThresholdCryptoConfigTest {
                 printCounter++
                 val subsetIds = subset.map { it.getId() }
                 val decryptionResult = ThresholdCryptoConfig.thresholdDecrypt(encryptedMessage, subset)
-                val decrypted = decryptionResult.message
+                val decrypted = decryptionResult?.message
                 if (printCounter % 50 == 0) {
                     println("Subset $subsetIds --> Decrypted Message: $decrypted")
                     println("Subset $subsetIds --> All ZKP proofs verified for this subset!")
@@ -106,15 +106,17 @@ class ThresholdCryptoConfigTest {
                 assertEquals(message, decrypted, "Decryption failed for subset IDs: $subsetIds, message: '$message'")
 
                 // Verify each decryption proof using the Verifier.
-                decryptionResult.proofs.forEach { (serverId, proof) ->
-                    // Find the corresponding server in the subset.
-                    val server = subset.first { it.getId() == serverId }
-                    val h_i = server.getPartialPublickey()   // FIXED name
-                    val d_i = server.computePartialDecryption(c1)
-                    val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
-                    val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                    val proofOk = verifyDecryptionProof(domainParameters, proof, h_iSerialized, d_iSerialized, c1Serialized)
-                    assertTrue(proofOk, "Proof verification failed for server $serverId in subset $subsetIds")
+                if (decryptionResult != null) {
+                    decryptionResult.proofs.forEach { (serverId, proof) ->
+                        // Find the corresponding server in the subset.
+                        val server = subset.first { it.getId() == serverId }
+                        val h_i = server.getPartialPublickey()   // FIXED name
+                        val d_i = server.computePartialDecryption(c1)
+                        val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
+                        val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
+                        val proofOk = verifyDecryptionProof(domainParameters, proof, h_iSerialized, d_iSerialized, c1Serialized)
+                        assertTrue(proofOk, "Proof verification failed for server $serverId in subset $subsetIds")
+                    }
                 }
             }
             println("✅ Message '$message' successfully decrypted by all combinations with valid ZKP proofs! 🚀\n")
@@ -164,9 +166,9 @@ class ThresholdCryptoConfigTest {
                 // Attempt a full threshold decrypt (which should fail).
                 try {
                     val decryptionResult = ThresholdCryptoConfig.thresholdDecrypt(encryptedMessage, subset)
-                    // If we got here, it means thresholdDecrypt didn't fail, which is unexpected.
+                    if (decryptionResult != null)
+                        fail("Insufficient subset $subsetIds unexpectedly succeeded in decrypting.")
                     // We assert a failure because we only have t-1 shares.
-                    fail("Insufficient subset $subsetIds unexpectedly succeeded in decrypting.")
                 } catch (e: IllegalStateException) {
                     // We expect an exception about "Not enough valid partial decryptions"
                     if (e.message?.contains("Not enough valid partial decryptions") == true) {
