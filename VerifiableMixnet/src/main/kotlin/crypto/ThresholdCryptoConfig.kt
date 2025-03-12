@@ -1,9 +1,7 @@
 package org.example.crypto
 
 import meerkat.protobuf.ConcreteCrypto
-import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
-import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
@@ -12,7 +10,6 @@ import org.example.mixnet.SchnorrProofDL
 import org.example.mixnet.ZKPUtils
 import java.math.BigInteger
 import java.security.KeyFactory
-import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.interfaces.ECPublicKey
 import java.util.concurrent.BlockingQueue

@@ -1,5 +1,6 @@
 package crypto
 
+import meerkat.protobuf.ConcreteCrypto.GroupElement
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -11,6 +12,8 @@ import org.example.crypto.CryptoUtils
 import org.example.crypto.ElGamal
 import org.example.crypto.ThresholdCryptoConfig
 import org.example.mixnet.MixBatchOutputVerifier
+import org.example.mixnet.SchnorrProofDL
+import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -114,7 +117,7 @@ class ThresholdCryptoConfigTest {
                     val d_i = server.computePartialDecryption(c1)
                     val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
                     val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                    val proofOk = mixBatchOutputVerifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
+                    val proofOk = verifyDecryptionProof(domainParameters, proof, h_iSerialized, d_iSerialized, c1Serialized)
                     assertTrue(proofOk, "Proof verification failed for server $serverId in subset $subsetIds")
                 }
             }
@@ -180,7 +183,7 @@ class ThresholdCryptoConfigTest {
                             val h_i = server.getPartialPublickey()
                             val h_iSerialized = CryptoUtils.serializeGroupElement(h_i)
                             val d_iSerialized = CryptoUtils.serializeGroupElement(d_i)
-                            val proofOk = mixBatchOutputVerifier.verifyDecryptionProof(proof, h_iSerialized, d_iSerialized, c1Serialized)
+                            val proofOk = verifyDecryptionProof(domainParameters, proof, h_iSerialized, d_iSerialized, c1Serialized)
                             assertTrue(
                                 proofOk,
                                 "Partial proof verification failed for server ${server.getId()} in insufficient subset $subsetIds"
@@ -199,6 +202,64 @@ class ThresholdCryptoConfigTest {
             println("✅ Message '$message' was NOT fully decrypted with insufficient servers, but all partial proofs are valid!\n")
         }
         println("🎉 Insufficient-server tests completed successfully for parameters (n=$n, t=$t)! All partial ZKP proofs verified! 🔐\n")
+    }
+
+    /**
+     * Verifies a decryption proof.
+     *
+     * For a given decryption share, the server’s proof (of type SchnorrProofDL) shows that
+     * the same secret s was used to compute both its public share (h = g^s) and its decryption share (d = c1^s).
+     *
+     * The function performs the following steps:
+     * 1. Concatenates the byte arrays of the commitments A_g and A_h from the proof,
+     *    and the serialized forms of h_i and d_i.
+     * 2. Computes the challenge as e = hash(concatenatedBytes) mod n.
+     * 3. Checks that:
+     *       g^z = A_g + h_i * e
+     *       c1^z = A_h + d_i * e
+     *
+     * @param proof The SchnorrProofDL containing A_g, A_h and response z.
+     * @param h_iSerialized The serialized form of the server’s public share (GroupElement).
+     * @param d_iSerialized The serialized form of the server’s decryption share (GroupElement).
+     * @param c1Serialized  The serialized form of c1 (used as the second base).
+     * @return true if the proof verifies, false otherwise.
+     */
+    fun verifyDecryptionProof(
+        domainParameters: ECDomainParameters,
+        proof: SchnorrProofDL,
+        h_iSerialized: GroupElement,
+        d_iSerialized: GroupElement,
+        c1Serialized: GroupElement
+    ): Boolean {
+        // Concatenate the commitments and the serialized public and decryption shares.
+        val baos = ByteArrayOutputStream()
+        fun putCommit(A_g: GroupElement, A_h: GroupElement) {
+            baos.write(A_g.data.toByteArray())
+            baos.write(A_h.data.toByteArray())
+        }
+        putCommit(proof.A_g, proof.A_h)
+        baos.write(h_iSerialized.data.toByteArray())
+        baos.write(d_iSerialized.data.toByteArray())
+
+        // Compute the challenge e.
+        val challenge = CryptoUtils.hashToBigInteger(baos.toByteArray()).mod(domainParameters.n)
+
+        // Compute the left-hand side for the first equation: g^z.
+        val lhs1 = domainParameters.g.multiply(proof.z).normalize()
+        // Compute the right-hand side: A_g + h_i * e.
+        val rhs1 = CryptoUtils.deserializeGroupElement(proof.A_g, domainParameters)
+            .add(CryptoUtils.deserializeGroupElement(h_iSerialized, domainParameters).multiply(challenge))
+            .normalize()
+
+        // Compute the left-hand side for the second equation: c1^z.
+        val lhs2 = CryptoUtils.deserializeGroupElement(c1Serialized, domainParameters)
+            .multiply(proof.z).normalize()
+        // Compute the right-hand side: A_h + d_i * e.
+        val rhs2 = CryptoUtils.deserializeGroupElement(proof.A_h, domainParameters)
+            .add(CryptoUtils.deserializeGroupElement(d_iSerialized, domainParameters).multiply(challenge))
+            .normalize()
+
+        return lhs1 == rhs1 && lhs2 == rhs2
     }
 
 }

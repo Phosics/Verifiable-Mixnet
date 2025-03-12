@@ -71,18 +71,6 @@ data class MixBatchOutput(
             }
         }
 
-        // Display the Ed25519 signature (if present)
-        if (signatureEd25519 != null) {
-            val sigHex = signatureEd25519.joinToString("") { "%02x".format(it) }
-            sb.append("  Ed25519 Signature: $sigHex\n")
-        }
-
-        // Display the Ed25519 public key (if present)
-        if (ed25519PublicKey != null) {
-            val pubKeyHex = ed25519PublicKey.encoded.joinToString("") { "%02x".format(it) }
-            sb.append("  Ed25519 Public: $pubKeyHex\n")
-        }
-
         return sb.toString()
     }
 
