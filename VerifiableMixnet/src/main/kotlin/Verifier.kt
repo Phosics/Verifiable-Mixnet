@@ -55,7 +55,7 @@ class Verifier() {
     ): Boolean {
         for ((serverId, mixBatch) in mixBatchOutputs) {
             // Each mix batch should contain an Ed25519 public key for the mixer.
-            val mixerKey = mixBatch.ed25519PublicKey ?: return false
+            val mixerKey = mixBatch.ed25519PublicKey // Assume this is a public key.
             // Convert the mixer's public key to a string representation.
             val mixerKeyEncoded = mixerKey.encoded.contentToString()
             // Check if the mixer's public key exists among the authorized mixers.
@@ -75,11 +75,14 @@ class Verifier() {
      * @return True if the signature is valid; false otherwise.
      */
     fun test4_VerifyEncryptedVoteListSignature(votes: BulletinBoardVotes, signature: ByteArray, signingKey: Ed25519PublicKeyParameters): Boolean {
+        // Concatenate the choices from all votes into a single string.
         val concatenatedChoices = votes.votes.map { it.choice }.joinToString("")
+
+        // Compute the SHA-256 hash of the concatenated choices.
         val digest = MessageDigest.getInstance("SHA-256")
         val hashBytes = digest.digest(concatenatedChoices.toByteArray(Charsets.UTF_8))
-        //val hashString = hashBytes.joinToString("") { "%02x".format(it) }
 
+        // Verify the signature using the hash bytes.
         return Ed25519Utils.verifySignature(hashBytes, signature, signingKey)
     }
 
@@ -124,15 +127,19 @@ class Verifier() {
      * @return True if each batch's output equals the next batch's input; false otherwise.
      */
     fun test8_VerifyMixingChain(mixBatchOutputs: Map<String, MixBatchOutput>): Boolean {
+        // Sort the mix batch outputs by index.
         val indexList = mixBatchOutputs.keys.map { it.toInt() }.sorted()
         var prevIndex = indexList[0]
 
+        // Iterate over the mix batch outputs and compare the last column of one batch with the first column of the next.
         for (i in indexList) {
             if(i == prevIndex) {
                 continue
             }
 
+            // Get the last ciphertexts of the previous batch.
             val prevBatch = mixBatchOutputs[prevIndex.toString()]!!.ciphertextsMatrix.map { it.last() }
+            // Get the first ciphertexts of the current batch.
             val currentBatch = mixBatchOutputs[i.toString()]!!.ciphertextsMatrix.map { it.first() }
 
             if (currentBatch.toSet() != prevBatch.toSet()) {
@@ -166,6 +173,8 @@ class Verifier() {
      * Test 9: Verifies the Zero-Knowledge Proofs for the decryption process.
      */
     fun test9_VerifyDecryptionZKP(thresholdResults: List<ThresholdDecryptionResult?>): Boolean {
+        // The threshold decryption verifies all the ZKPs.
+        // Therefore, we only need to check if all all the results are not null.
         return thresholdResults.all { it != null }
 
     }

@@ -11,10 +11,16 @@ import crypto.ThresholdDecryptionResult
 import java.security.SecureRandom
 import java.security.Security
 
+/*
+    * The Server class is responsible for running the main server logic.
+ */
 class Server {
     private val logger = LogManager.getLogger(Server::class.java)
     private val secureRandom = SecureRandom.getInstanceStrong()
 
+    /**
+     * The main server loop.
+     */
     fun run() {
         logger.info("Starting Kotlin server...")
         Security.addProvider(BouncyCastleProvider())
@@ -65,17 +71,14 @@ class Server {
 
             logger.info("Starting to decrypt the votes")
             val votes = VotesReceiver().getVotes(bulletinboard, publicKey, domainParameters, startMix.pollId)
-
             val decryptionServers = thresholdServers.shuffled().take(config.decryptionServersRequired)
             val thresholdResults : MutableList<ThresholdDecryptionResult?> = mutableListOf()
-
             for(vote in votes) {
                 val thresholdResult = ThresholdCryptoConfig.thresholdDecrypt(vote.getEncryptedMessage(), decryptionServers)
                 thresholdResults.add(thresholdResult)
             }
 
             logger.info("Running verifier...")
-
             val verifier = Verifier()
             val mixBatchOutputs = bulletinboard.getMixBatchOutputs(startMix.pollId)
 
@@ -116,6 +119,7 @@ class Server {
             val test9Result = verifier.test9_VerifyDecryptionZKP(thresholdResults)
             logger.info("Test 9 Result: $test9Result")
 
+            // Post the results to the Bulletin Board
             val verifierResults : MutableList<VerifierResult> = mutableListOf()
             verifierResults.add(VerifierResult(1, BBKeyHash))
             verifierResults.add(VerifierResult(2, test2Result.toString()))
@@ -127,6 +131,7 @@ class Server {
             verifierResults.add(VerifierResult(8, test8Result.toString()))
             verifierResults.add(VerifierResult(9, test9Result.toString()))
 
+            // Count the results
             val results = thresholdResults.filter { it!!.message != "null" }.map { it!!.message }.groupingBy { it }.eachCount()
             val proofs = thresholdResults.filter { it!!.message != "null" }.map {it!!.toStringProofs()}
 

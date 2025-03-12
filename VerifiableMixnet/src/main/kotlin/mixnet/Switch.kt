@@ -67,8 +67,6 @@ class Switch(
 
         this.zkp = ZKPUtils.serializeZKP(this.zkpOrProof!!)
 
-        // TODO: deal with the location of the ZKP
-
         return rerandomizedVotes
     }
 
