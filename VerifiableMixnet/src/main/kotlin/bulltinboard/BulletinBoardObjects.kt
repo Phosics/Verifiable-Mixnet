@@ -1,14 +1,19 @@
 package bulltinboard
 
+import com.google.gson.Gson
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing.Mix2Proof
 import meerkat.protobuf.Mixing.MixBatchHeader
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.util.io.pem.PemReader
 import org.example.crypto.CryptoUtils
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.Vote
+import java.io.StringReader
 import java.security.KeyFactory
 import java.security.PublicKey
 import java.security.spec.X509EncodedKeySpec
@@ -160,7 +165,9 @@ data class BulletinBoardMixBatchOutputRecord(
     @SerialName("signature")
     val signature: String,
     @SerialName("publicKey")
-    val  publicKey: String
+    val publicKey: String,
+    @SerialName("pollId")
+    val pollId: String
 ) {
     fun extract(): MixBatchOutput {
         val decoder = Base64.getDecoder()
@@ -231,29 +238,33 @@ data class BulletinBoardConfig(
     @SerialName("timestamp")
     val timestamp: String
 ) {
+    fun getPublicKey(): Ed25519PublicKeyParameters {
+        // Create a PemReader to parse the PEM string
+        val pemReader = PemReader(StringReader(publicKey))
+        val pemObject = pemReader.readPemObject()
+        pemReader.close()
 
-    fun getPublicKey(): PublicKey {
-        val publicKeyPEM = publicKey
-            .replace("-----BEGIN PUBLIC KEY-----", "")
-            .replace("-----END PUBLIC KEY-----", "")
-            .replace("\\s".toRegex(), "")
+        // The content should be an X.509 SubjectPublicKeyInfo structure
+        val spki = SubjectPublicKeyInfo.getInstance(pemObject.content)
 
-        // Decode the Base64 encoded string
-        val decoded = Base64.getDecoder().decode(publicKeyPEM)
+        // Extract the raw public key bytes from the structure
+        val keyBytes = spki.publicKeyData.bytes
 
-        // Generate the PublicKey object
-        val keySpec = X509EncodedKeySpec(decoded)
-        val keyFactory = KeyFactory.getInstance("ed25519")
-        return keyFactory.generatePublic(keySpec)
+        // Create and return the Ed25519PublicKeyParameters (offset is 0)
+        return Ed25519PublicKeyParameters(keyBytes, 0)
+    }
+
+    override fun toString(): String {
+        return Json.encodeToString(this)
     }
 }
 
 
 @Serializable
 data class BulletinBoardConfigData(
-        @SerialName("bbCongif")
-        val bbConig: BulletinBoardConfig,
-        @SerialName("bbConfigSignature")
-        val bbConfigSignature: String
-    )
+    @SerialName("bbConfig")
+    val bbConig: BulletinBoardConfig,
+    @SerialName("bbConfigSignature")
+    val bbConfigSignature: String
+)
 

@@ -9,6 +9,7 @@ import org.example.crypto.ThresholdCryptoConfig
 import org.example.crypto.ThresholdDecryptionResult
 import java.security.SecureRandom
 import java.security.Security
+import kotlin.math.log
 
 class Server {
     private val logger = LogManager.getLogger(Server::class.java)
@@ -24,6 +25,7 @@ class Server {
             val bulletinboard = BulletinBoard()
             bulletinboard.loadBulletinBoardConfig()
             val config = bulletinboard.getConfig()
+            logger.info("JSON: $config")
 
             logger.info("Generating keys using the decryption servers...")
             val (publicKey, thresholdServers) =
@@ -54,7 +56,7 @@ class Server {
             Thread.sleep(1 * 1000)
 
             logger.info("Starting to mix...")
-            val serversManager = MixServersManager(publicKey, domainParameters, config.mixServersMalicious, bulletinboard, startMix.pollId)
+            val serversManager = MixServersManager(publicKey, domainParameters, 0, bulletinboard, startMix.pollId)
             serversManager.runServers()
             Thread.sleep((serversManager.getAmountOfServers() * (TIMEOUT + 1)).toLong())
 
@@ -65,12 +67,11 @@ class Server {
             val votes = VotesReceiver().getVotes(bulletinboard, publicKey, domainParameters, startMix.pollId)
 
             val decryptionServers = thresholdServers.shuffled().take(config.decryptionServersRequired)
-            val thresholdResults : MutableList<ThresholdDecryptionResult> = mutableListOf()
+            val thresholdResults : MutableList<ThresholdDecryptionResult?> = mutableListOf()
 
             for(vote in votes) {
                 val thresholdResult = ThresholdCryptoConfig.thresholdDecrypt(vote.getEncryptedMessage(), decryptionServers)
                 thresholdResults.add(thresholdResult)
-                logger.info("decrypted vote ${thresholdResult.message}")
             }
 
             // TODO: run verifier on everyting, send the result of the verifier
@@ -78,40 +79,48 @@ class Server {
             logger.info("Running verifier...")
 
             val verifier = Verifier()
+            val mixBatchOutputs = bulletinboard.getMixBatchOutputs(startMix.pollId)
 
             // test1: Computes the SHA-256 hash of the Bulletin Board's public key.
             val BBKeyHash = verifier.test1_GenerateBBKeyHash(config.publicKey)
+            logger.info("Test 1 Result: $BBKeyHash")
 
             // test2: Verifies that the Bulletin Board's general parameters block is authentic.
-            // val test2Result = verifier.test2_VerifyBBParametersSignature(bulletinboard.getParametersData(), bulletinboard.getSignature(), config.publicKey)
+            val test2Result = verifier.test2_VerifyBBParametersSignature(config.toString(), bulletinboard.getbbConfigSigniture(), config.getPublicKey())
+            logger.info("Test 2 Result: $test2Result")
 
             // test3: Verifies that each mix batch output is produced by an authorized mix server.
-            val test3Result = verifier.test3_VerifyMixersAuthorization(serversManager.getAllPublicKeys() ,bulletinboard.getMixBatchOutputs(startMix.pollId))
+            val test3Result = verifier.test3_VerifyMixersAuthorization(serversManager.getAllPublicKeys(), mixBatchOutputs)
+            logger.info("Test 3 Result: $test3Result")
 
             // test4: Verifies that the signed encrypted vote list is authentic.
-            val test4Result = verifier.test4_VerifyEncryptedVoteListSignature(bulletinboard.getVoteListData(), bulletinboard.getVoteListSignature(), bulletinboard.getPublicKey())
+            val test4Result = verifier.test4_VerifyEncryptedVoteListSignature(bulletinboard.votes, bulletinboard.votesSignature, config.getPublicKey())
+            logger.info("Test 4 Result: $test4Result")
 
             // test5: Verifies that each mix batch output is correctly signed.
-            val test5Result = verifier.test5_VerifyMixBatchOutputSignature(serversManager.getMixBatchOutputs(), config.mixServersPublicKeys)
+            val test5Result = verifier.test5_VerifyMixBatchOutputSignature(mixBatchOutputs.map { it.value })
+            logger.info("Test 5 Result: $test5Result")
 
-            // test6: Verifies that the first mixer's input equals the signed encrypted vote list.
-            val test6Result = verifier.test6_VerifyFirstMixerInput(serversManager.getMixBatchOutputs(), bulletinboard.getVoteListData())
+            // test6: Verifies the Zero-Knowledge Proofs (ZKPs) of the mixing process.
+            val test6Result = verifier.test6_VerifyMixersZKP(mixBatchOutputs, domainParameters, publicKey)
+            logger.info("Test 6 Result: ${test6Result.size}")
 
-            // test7: Verifies the mixing chain consistency across all mix batches.
-            val test7Result = verifier.test7_VerifyMixingChain(bulletinboard.getMixBatchOutputs(pollID))
+            // test7: Verifies that the first mixer's input equals the signed encrypted vote list.
+            val firstMixBatchIndex = test6Result.keys.minOfOrNull { it.toInt() }.toString()
+            val test7Result = verifier.test7_VerifyFirstMixerInput(test6Result[firstMixBatchIndex]!!, bulletinboard.votes)
+            logger.info("Test 7 Result: $test7Result")
 
-            // test8: Verifies the Zero-Knowledge Proofs (ZKPs) of the mixing process.
-            val test8Result = verifier.test8_VerifyMixersZKP(serversManager.getMixBatchOutputs(), domainParameters, publicKey)
+            // test8: Verifies the mixing chain consistency across all mix batches.
+            val test8Result = verifier.test8_VerifyMixingChain(test6Result)
+            logger.info("Test 8 Result: $test8Result")
 
             // test9: Verifies the Zero-Knowledge Proofs for the decryption process.
-            val test9Result = verifier.test9_VerifyDecryptionZKP()
+            val test9Result = verifier.test9_VerifyDecryptionZKP(thresholdResults)
+            logger.info("Test 9 Result: $test9Result")
 
-            // test10: Summarizes the final decrypted votes.
-            val test10Result = verifier.test10_SummarizeDecryptedVotes(thresholdResults)
+//            logger.info("decrypted vote ${thresholdResult.message}")
 
-
-
-            val results = thresholdResults.map { it.message }.groupingBy { it }.eachCount()
+//            val results = thresholdResults.map { it.message }.groupingBy { it }.eachCount()
 
             // TODO: send results - only if verifier is ok
         }

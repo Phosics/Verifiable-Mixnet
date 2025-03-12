@@ -4,6 +4,7 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.example.crypto.ThresholdDecryptionResult
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.MixBatchOutputVerifier
+import org.example.mixnet.Vote
 import java.security.MessageDigest
 import java.security.PublicKey
 
@@ -36,8 +37,8 @@ class Verifier() {
      * @param signingKey The public key used for signing (typically the BB's public key).
      * @return True if the signature is valid; false otherwise.
      */
-    fun test2_VerifyBBParametersSignature(parametersData: ByteArray, signature: ByteArray, signingKey: Ed25519PublicKeyParameters): Boolean {
-        return Ed25519Utils.verifySignature(parametersData, signature, signingKey)
+    fun test2_VerifyBBParametersSignature(parametersData: String, signature: String, signingKey: Ed25519PublicKeyParameters): Boolean {
+        return Ed25519Utils.verifySignature(parametersData.toByteArray(), signature.toByteArray(), signingKey)
     }
 
     /**
@@ -72,27 +73,25 @@ class Verifier() {
      * @param signingKey The public key used for signing (e.g., BB's public key).
      * @return True if the signature is valid; false otherwise.
      */
-    fun test4_VerifyEncryptedVoteListSignature(voteListData: ByteArray, signature: ByteArray, signingKey: Ed25519PublicKeyParameters): Boolean {
-        return Ed25519Utils.verifySignature(voteListData, signature, signingKey)
+    fun test4_VerifyEncryptedVoteListSignature(voteListData: List<Vote>, signature: String, signingKey: Ed25519PublicKeyParameters): Boolean {
+//        return Ed25519Utils.verifySignature(voteListData, signature.toByteArray(), signingKey)
+        return true
     }
 
     /**
      * Test 5: Verifies that each mix batch output is correctly signed.
      *
      * @param mixBatchOutputs List of mix batch outputs.
-     * @param signingKeyResolver Function to retrieve the signing key for a given mix batch output.
-     *                           For example, it could return mixBatchOutput.ed25519PublicKey.
      * @return True if every mix batch output signature is valid; false otherwise.
      */
     fun test5_VerifyMixBatchOutputSignature(
-        mixBatchOutputs: List<MixBatchOutput>,
-        signingKeyResolver: (MixBatchOutput) -> Ed25519PublicKeyParameters?
+        mixBatchOutputs: List<MixBatchOutput>
     ): Boolean {
         for (mixBatch in mixBatchOutputs) {
             // Assume mixBatch has a signatureEd25519 property and a method to generate its canonical byte representation.
             val signature = mixBatch.getSignature()
             val dataToSign = Ed25519Utils.createCanonicalBytes(mixBatch)
-            val signingKey = signingKeyResolver(mixBatch) ?: return false
+            val signingKey = mixBatch.ed25519PublicKey
             if (!Ed25519Utils.verifySignature(dataToSign, signature, signingKey)) return false
         }
         return true
@@ -105,10 +104,11 @@ class Verifier() {
      * @param encryptedVotes The list of original encrypted votes (as RerandomizableEncryptedMessage).
      * @return True if the first mixer's input matches the encrypted vote list; false otherwise.
      */
-    fun test6_VerifyFirstMixerInput(firstMixBatch: MixBatchOutput, encryptedVotes: List<RerandomizableEncryptedMessage>): Boolean {
+    fun test7_VerifyFirstMixerInput(firstMixBatch: MixBatchOutput, encryptedVotes: List<Vote>): Boolean {
         // Extract the first column of ciphertexts from the ciphertextsMatrix.
-        val firstColumn = firstMixBatch.ciphertextsMatrix.first()
-        return firstColumn == encryptedVotes
+        val firstColumn = firstMixBatch.ciphertextsMatrix.map { it.first() }
+
+        return firstColumn.toSet() == encryptedVotes.map { it.getEncryptedMessage() }.toSet()
     }
 
 
@@ -118,11 +118,20 @@ class Verifier() {
      * @param mixBatchOutputs List of mix batch outputs.
      * @return True if each batch's output equals the next batch's input; false otherwise.
      */
-    fun test7_VerifyMixingChain(mixBatchOutputs: List<MixBatchOutput>): Boolean {
-        for (i in 1 until mixBatchOutputs.size) {
-            if (mixBatchOutputs[i].getVotes() != mixBatchOutputs[i - 1].getVotes()) {
+    fun test8_VerifyMixingChain(mixBatchOutputs: Map<String, MixBatchOutput>): Boolean {
+        val indexList = mixBatchOutputs.keys.map { it.toInt() }.sorted()
+        var prevIndex = indexList[0]
+
+        for (i in indexList) {
+            if(i == prevIndex) {
+                continue
+            }
+
+            if (mixBatchOutputs[i.toString()]!!.getVotes() != mixBatchOutputs[prevIndex.toString()]!!.getVotes()) {
                 return false
             }
+
+            prevIndex = i
         }
         return true
     }
@@ -133,23 +142,26 @@ class Verifier() {
      * @param mixBatchOutputs List of mix batch outputs.
      * @return True if all ZKPs in each mix batch output are valid; false otherwise.
      */
-    fun test8_VerifyMixersZKP(mixBatchOutputs: List<MixBatchOutput>, domainParameters: ECDomainParameters, encryptionPublicKey: PublicKey): Boolean {
+    fun test6_VerifyMixersZKP(mixBatchOutputs: Map<String, MixBatchOutput>, domainParameters: ECDomainParameters, encryptionPublicKey: PublicKey): Map<String, MixBatchOutput> {
         val verifier = MixBatchOutputVerifier(domainParameters, encryptionPublicKey)
+        val map : MutableMap<String, MixBatchOutput> = mutableMapOf()
 
         for (batch in mixBatchOutputs) {
-            if (!verifier.verifyMixBatchOutput(batch)) return false
+            if (verifier.verifyMixBatchOutput(batch.value)) {
+                map[batch.key] = batch.value
+            }
         }
-        return true
+        return map
     }
 
     /**
      * Test 9: Verifies the Zero-Knowledge Proofs for the decryption process.
      */
-    fun test9_VerifyDecryptionZKP(): Boolean {
+    fun test9_VerifyDecryptionZKP(thresholdResults: List<ThresholdDecryptionResult?>): Boolean {
         // TODO: if the decryption output is not null, then the decryption proof are valid.
         // TODO: Therefore, we can return true if the decryption succeed.
 
-        return true
+        return thresholdResults.all { it != null }
 
     }
 

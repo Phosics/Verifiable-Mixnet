@@ -286,7 +286,7 @@ object ThresholdCryptoConfig {
     fun thresholdDecrypt(
         encryptedMessage: RerandomizableEncryptedMessage,
         participatingServers: List<ThresholdServer>
-    ): ThresholdDecryptionResult {
+    ): ThresholdDecryptionResult? {
         val ciphertext = CryptoUtils.unwrapCiphertext(encryptedMessage)
         val c1 = CryptoUtils.deserializeGroupElement(ciphertext.c1, ecDomainParameters)
         val c2 = CryptoUtils.deserializeGroupElement(ciphertext.c2, ecDomainParameters)
@@ -296,8 +296,7 @@ object ThresholdCryptoConfig {
             val d_i = server.computePartialDecryption(c1)
             val proof_i = server.generateDecryptionProof(c1)
             // Verify the proof immediately
-            val partialPubKey = server.partialPublicKey
-                ?: throw IllegalStateException("No partial public key for server ${server.getId()}")
+            val partialPubKey = server.partialPublicKey!!
 
             val isValid = verifyDecryptionProof(partialPubKey, c1, d_i, proof_i)
             // Return everything in a single triple
@@ -309,7 +308,7 @@ object ThresholdCryptoConfig {
 
         // If not enough partials are valid, we can't decrypt fully
         if (validPartials.size < participatingServers[0].t) {
-            throw IllegalStateException("Not enough valid partial decryptions to meet threshold.")
+            return null
         }
 
         // Combine only valid partial decryptions
