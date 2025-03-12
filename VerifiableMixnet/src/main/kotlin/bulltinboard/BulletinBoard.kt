@@ -9,8 +9,7 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
-import org.example.bulltinboard.BulletinBoardVotes
-import org.example.bulltinboard.PublicKeyData
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.Vote
 import java.security.PublicKey
@@ -22,10 +21,14 @@ import kotlin.math.pow
 
 const val TIMEOUT = 5000
 
-class BulletinBoard {
+class BulletinBoard() {
+    private val signatureMap : HashMap<String, PublicKey> = HashMap()
+    private lateinit var config : BulletinBoardConfig
+
     val localhost = "http://localhost:3000/api"
     var numberOfVotes : Int = 0
     var votes : List<Vote> = mutableListOf()
+    var votesSignature: String = ""
 
     val client : HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -34,48 +37,51 @@ class BulletinBoard {
     }
 
     fun loadVotes() {
-        votes = sendGetRequest<BulletinBoardVotes>("$localhost/votes").extractVotes()
-        // TODO: verify
-        // TODO: Browser should add dummy votes when finish voting
+        val bulletinBoardVotes = sendGetRequest<BulletinBoardVotes>("$localhost/votes")
+        votes = bulletinBoardVotes.extractVotes()
         numberOfVotes = 2.0.pow(ceil(log2(votes.size.toDouble())).toInt()).toInt()
+        votesSignature = bulletinBoardVotes.signedHashedEncryptedVotes
     }
 
-    fun sendMixBatchOutput(mixBatch : MixBatchOutput) {
-        println(mixBatch)
+    fun sendMixBatchOutput(index : Int, pollID: String, mixBatch : MixBatchOutput) {
         val header = toBase64(mixBatch.header)
         val cipherTextMatrix = toBase64(mixBatch.ciphertextsMatrix)
         val proofs = toBase64(mixBatch.proofsMatrix)
+        val signature = mixBatch.getSignature().decodeToString() // TODO: Hex
+        val publicKey = edPublicKeyToBase64(mixBatch.ed25519PublicKey)
 
-        val payload = BulletinBoardMixBatchOutput(header, cipherTextMatrix, proofs)
+        val mixBatchOutputPayload = BulletinBoardMixBatchOutput(header, cipherTextMatrix, proofs)
+        val payload = BulletinBoardMixBatchOutputData(index.toString(), mixBatchOutputPayload, signature, publicKey, pollID)
 
         runBlocking {
-            client.post("$localhost/mixBatch") {
+            client.post("$localhost/mix-batches") {
                 contentType(ContentType.Application.Json)
                 setBody(payload)
             }
         }
     }
 
-    fun getMixBatchOutputs(): List<MixBatchOutput> {
-        return sendGetRequest<BulletinBoardMixBatchOutputs>("$localhost/mixBatch").extract()
+    fun loadBulletinBoardConfig() {
+        config = sendGetRequest<BulletinBoardConfig>("$localhost/bb-config")
     }
 
-    fun sendPublicKey(publicKey: ECPublicKey) {
-//        val payload = PublicKeyData(convertPublicKey(publicKey))
+    fun getConfig() : BulletinBoardConfig {
+        return config
+    }
 
-        val ecPoint = publicKey.w
+    fun addSignaturePublicKey(index : String, publicKey: PublicKey) {
+        signatureMap[index] = publicKey
+    }
 
-        // Convert X and Y coordinates to hexadecimal
-        val xHex = ecPoint.affineX.toString(16)
-        val yHex = ecPoint.affineY.toString(16)
+    fun getMixServerSignaturePublicKey(index : String) : PublicKey? {
+        return signatureMap[index]
+    }
 
-        println("X Orig: $xHex")
-        println("Y Orig: $yHex")
+    fun getMixBatchOutputs(pollID: String): Map<String, MixBatchOutput> {
+        return sendGetRequest<BulletinBoardMixBatchOutputs>("$localhost/mix-batches/${pollID}").extract()
+    }
 
-        val publicKeyHex = ecPublicKeyToHex(publicKey)
-
-        println("PublicKey Hex: $publicKeyHex")
-
+    fun sendVotingPublicKey(publicKey: ECPublicKey) {
         val payload = PublicKeyData(ecPublicKeyToHex(publicKey))
 
         runBlocking {
@@ -86,7 +92,33 @@ class BulletinBoard {
         }
     }
 
-    inline fun <reified T> sendGetRequest(url : String) : T {
+    fun sendResults() {
+        val payload = Results("", "", "")
+
+        runBlocking {
+            client.post("$localhost/results") {
+                contentType(ContentType.Application.Json)
+                setBody(payload)
+            }
+        }
+    }
+
+    fun startMix() : StartMix {
+        return sendPutRequest<StartMix>("$localhost/polls/start-mix")
+    }
+
+    fun endMix() : EndMix {
+        return sendPutRequest<EndMix>("$localhost/polls/end-mix")
+    }
+
+
+    private inline fun <reified T> sendPutRequest(url : String) : T {
+        return runBlocking {
+            client.put(url).body()
+        }
+    }
+
+    private inline fun <reified T> sendGetRequest(url : String) : T {
         return runBlocking {
             client.get(url).body()
         }
@@ -118,6 +150,13 @@ class BulletinBoard {
 
         return result
     }
+}
+
+fun edPublicKeyToBase64(publicKey: Ed25519PublicKeyParameters): String {
+    val keyBytes = ByteArray(Ed25519PublicKeyParameters.KEY_SIZE)
+    publicKey.encode(keyBytes, 0)
+    // Convert the byte array to a Base64-encoded string.
+    return Base64.getEncoder().encodeToString(keyBytes)
 }
 
 fun ecPublicKeyToHex(publicKey: ECPublicKey, compressed: Boolean = false): String {

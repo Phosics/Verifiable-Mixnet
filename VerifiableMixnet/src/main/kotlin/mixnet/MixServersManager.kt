@@ -18,7 +18,8 @@ class MixServersManager(
     private val publicKey: PublicKey,
     private val domainParameters: ECDomainParameters,
     private val t: Int,
-    private val bulletinBoard: BulletinBoard
+    private val bulletinBoard: BulletinBoard,
+    private val pollID: String
 ) {
     private val n = bulletinBoard.numberOfVotes
     private val numServers = 2 * t + 1
@@ -34,7 +35,7 @@ class MixServersManager(
         // Initialize 2t + 1 MixServer instances
         mixServers = List(numServers) { index ->
             logger.info("Initializing MixServer ${index + 1}/$numServers with n=$n")
-            MixServer(publicKey, domainParameters, index)
+            MixServer(domainParameters, publicKey, index, bulletinBoard, pollID)
         }
 
         // Create a CoroutineScope for each MixServer with a dedicated dispatcher

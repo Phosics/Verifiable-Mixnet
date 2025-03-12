@@ -26,7 +26,10 @@ object Ed25519Utils {
         val signature = signer.generateSignature()
 
         // 4) Return a copy of batch with signature attached
-        return batch.copy(signatureEd25519 = signature)
+        val signedBatch = batch.copy()
+        signedBatch.setSignature(signature)
+
+        return signedBatch
     }
 
     /**
@@ -36,10 +39,11 @@ object Ed25519Utils {
         batch: MixBatchOutput,
         publicKey: Ed25519PublicKeyParameters
     ): Boolean {
-        val sig = batch.signatureEd25519 ?: return false // No signature? fail
+        val sig = batch.getSignature()
 
         // 1) Serialize "core data"
-        val bytesToCheck = createCanonicalBytes(batch.copy(signatureEd25519 = null))
+        val unsignedBatch = batch.copy()
+        val bytesToCheck = createCanonicalBytes(unsignedBatch)
 
         // 2) Create verifier
         val verifier = Ed25519Signer()

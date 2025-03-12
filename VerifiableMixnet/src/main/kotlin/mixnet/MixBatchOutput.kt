@@ -1,12 +1,9 @@
 package org.example.mixnet
 
-import meerkat.protobuf.Crypto
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing
-import org.bouncycastle.util.encoders.Hex.toHexString
-import java.io.OutputStream
-import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import java.io.OutputStream
 
 
 /**
@@ -15,23 +12,20 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 
 data class MixBatchOutput(
     val header: Mixing.MixBatchHeader,
-    val ciphertextsMatrix: List<List<Crypto.RerandomizableEncryptedMessage>>,
+    val ciphertextsMatrix: List<List<RerandomizableEncryptedMessage>>,
     val proofsMatrix: List<List<Mixing.Mix2Proof>>,
-
-    val defaultProof:  Mixing.Mix2Proof = Mixing.Mix2Proof.newBuilder()
-        .setFirstMessage(Mixing.Mix2Proof.FirstMessage.getDefaultInstance())
-        .setFinalMessage(Mixing.Mix2Proof.FinalMessage.getDefaultInstance())
-        .setLocation(Mixing.Mix2Proof.Location.newBuilder()
-            .setLayer(0)        // Example value
-            .setSwitchIdx(0)    // Example value
-            .setOut0(0)         // Example value
-            .setOut1(1)         // Example value
-            .build())
-        .build(),
-
-    val signatureEd25519: ByteArray? = null,
-    val ed25519PublicKey : Ed25519PublicKeyParameters? = null
+    val ed25519PublicKey : Ed25519PublicKeyParameters
 ) {
+    private lateinit var signatureEd25519: ByteArray
+
+    fun getSignature() : ByteArray {
+        return signatureEd25519
+    }
+
+    fun setSignature(bytes: ByteArray) {
+        signatureEd25519 = bytes
+    }
+
     override fun toString(): String {
         val sb = StringBuilder()
         sb.append("MixBatchOutput:\n")

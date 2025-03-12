@@ -15,7 +15,10 @@ import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import java.math.BigInteger
 import java.security.MessageDigest
+import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.Signature
+import java.util.*
 
 /**
  * CryptoUtils provides utility functions for serializing and deserializing
@@ -142,4 +145,41 @@ object CryptoUtils {
         }
     }
 
+    fun signData(data : String, privateKey: PrivateKey) : String {
+        // Create a Signature instance using SHA256 with RSA algorithm
+        val signature = Signature.getInstance("SHA256withRSA")
+        signature.initSign(privateKey)
+        signature.update(data.toByteArray(Charsets.UTF_8))
+
+        // Generate the digital signature
+        val signedBytes = signature.sign()
+
+        // Encode the signature (e.g., using Base64) for easier storage/transmission
+        return Base64.getEncoder().encodeToString(signedBytes)
+    }
+
+    fun verifySignature(data : String, signatureStr : String, publicKey: PublicKey) : Boolean {
+        val signature = Signature.getInstance("SHA256withRSA")
+        signature.initVerify(publicKey)
+        signature.update(data.toByteArray(Charsets.UTF_8))
+
+        // Decode the signature from Base64
+        val signatureBytes = Base64.getDecoder().decode(signatureStr)
+
+        return signature.verify(signatureBytes)
+    }
+
+    /**
+     * Converts a hex string to a ByteArray.
+     *
+     * @param hex The hex string to convert.
+     * @return The resulting ByteArray.
+     * @throws IllegalArgumentException If the hex string is invalid.
+     */
+    fun hexStringToByteArray(hex: String): ByteArray {
+        require(hex.length % 2 == 0) { "Invalid hex string: length must be even." }
+        return ByteArray(hex.length / 2) { index ->
+            hex.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
+    }
 }

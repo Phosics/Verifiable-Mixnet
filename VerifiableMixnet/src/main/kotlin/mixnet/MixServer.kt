@@ -20,10 +20,11 @@ import java.util.*
  * It serializes the output as per the specified on-disk format.
  */
 class MixServer(
-    publicKey: PublicKey,
-    domainParameters: ECDomainParameters,
-    private val index: Int) {
-    private val bulletinBoard : BulletinBoard = BulletinBoard()
+    private val domainParameters: ECDomainParameters,
+    private val publicKey: PublicKey,
+    private val index: Int,
+    private val bulletinBoard: BulletinBoard,
+    private val pollID: String) {
     private val n : Int = bulletinBoard.numberOfVotes
 
     private val random = SecureRandom.getInstanceStrong()
@@ -62,7 +63,9 @@ class MixServer(
         delay(((index + 1) * TIMEOUT).toLong())
         logger.info("Server ${index + 1} Waking up...")
 
-        val (mixedVotes, ciphertextsMatrix, proofsMatrix) = permutationNetwork.apply(getVotes())
+        val votes = VotesReceiver().getVotes(bulletinBoard, publicKey, domainParameters, pollID)
+
+        val (_, ciphertextsMatrix, proofsMatrix) = permutationNetwork.apply(votes)
 
         // Build MixBatchOutput
         val unsignedBatch = createMixBatchOutput(ciphertextsMatrix, proofsMatrix, ed25519PublicKey)
@@ -70,26 +73,9 @@ class MixServer(
         //  Sign the MixBatchOutput with this server's Ed25519 private key
         val signedBatch = Ed25519Utils.signMixBatchOutput(unsignedBatch, ed25519PrivateKey)
 
-        // TODO: publish the signed batch to the bulletin board
+        bulletinBoard.sendMixBatchOutput(index,pollID, signedBatch)
 
-        bulletinBoard.sendMixBatchOutput(signedBatch)
-
-        logger.info("Published votes and proofs.")
-    }
-
-    private fun getVotes(): List<Vote> {
-        logger.info("Getting the starting votes...")
-        var currentVotes = bulletinBoard.votes
-        val mixBatches = bulletinBoard.getMixBatchOutputs()
-
-        for (mixBatch in mixBatches) {
-            logger.info("Verifying the votes published in mixBatch ${mixBatch.header}...")
-
-            // TODO: verify mixbatch
-            currentVotes = mixBatch.getVotes()
-        }
-
-        return currentVotes
+        logger.info("Mix server ${index} Published votes and proofs.")
     }
 
     private fun validatePublicKey(key: PublicKey) {

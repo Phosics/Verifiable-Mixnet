@@ -85,7 +85,7 @@ class Verifier() {
     ): Boolean {
         for (mixBatch in mixBatchOutputs) {
             // Assume mixBatch has a signatureEd25519 property and a method to generate its canonical byte representation.
-            val signature = mixBatch.signatureEd25519 ?: return false
+            val signature = mixBatch.getSignature()
             val dataToSign = Ed25519Utils.createCanonicalBytes(mixBatch)
             val signingKey = signingKeyResolver(mixBatch) ?: return false
             if (!Ed25519Utils.verifySignature(dataToSign, signature, signingKey)) return false
