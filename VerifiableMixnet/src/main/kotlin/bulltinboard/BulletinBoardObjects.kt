@@ -232,7 +232,7 @@ data class BulletinBoardConfig(
     val timestamp: String
 ) {
 
-    fun getPublicKey() : PublicKey {
+    fun getPublicKey(): PublicKey {
         val publicKeyPEM = publicKey
             .replace("-----BEGIN PUBLIC KEY-----", "")
             .replace("-----END PUBLIC KEY-----", "")
@@ -247,3 +247,13 @@ data class BulletinBoardConfig(
         return keyFactory.generatePublic(keySpec)
     }
 }
+
+
+@Serializable
+data class BulletinBoardConfigData(
+        @SerialName("bbCongif")
+        val bbConig: BulletinBoardConfig,
+        @SerialName("bbConfigSignature")
+        val bbConfigSignature: String
+    )
+

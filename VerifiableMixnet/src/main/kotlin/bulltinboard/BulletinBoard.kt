@@ -23,7 +23,7 @@ const val TIMEOUT = 5000
 
 class BulletinBoard() {
     private val signatureMap : HashMap<String, PublicKey> = HashMap()
-    private lateinit var config : BulletinBoardConfig
+    private lateinit var config : BulletinBoardConfigData
 
     val localhost = "http://localhost:3000/api"
     var numberOfVotes : Int = 0
@@ -62,11 +62,15 @@ class BulletinBoard() {
     }
 
     fun loadBulletinBoardConfig() {
-        config = sendGetRequest<BulletinBoardConfig>("$localhost/bb-config")
+        config = sendGetRequest<BulletinBoardConfigData>("$localhost/bb-config")
     }
 
     fun getConfig() : BulletinBoardConfig {
-        return config
+        return config.bbConig
+    }
+
+    fun getbbConfigSigniture() : String {
+        return config.bbConfigSignature
     }
 
     fun addSignaturePublicKey(index : String, publicKey: PublicKey) {

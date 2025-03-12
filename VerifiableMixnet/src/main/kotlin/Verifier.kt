@@ -43,21 +43,26 @@ class Verifier() {
     /**
      * Test 3: Verifies that each mix batch output is produced by an authorized mix server.
      *
-     * @param authorizedMixers List of authorized mix server public keys.
-     * @param mixBatchOutputs List of mix batch outputs.
+     * @param authorizedMixers Map of authorized mix server public keys, keyed by server ID as a String.
+     * @param mixBatchOutputs Map of mix batch outputs, keyed by server ID as a String.
      * @return True if every mix batch output comes from an authorized mixer; false otherwise.
      */
-    fun test3_VerifyMixersAuthorization(authorizedMixers: List<PublicKey>, mixBatchOutputs: List<MixBatchOutput>): Boolean {
-        for (mixBatch in mixBatchOutputs) {
-            // Assume each mix batch contains an ed25519PublicKey field
+    fun test3_VerifyMixersAuthorization(
+        authorizedMixers: Map<String, Ed25519PublicKeyParameters>,
+        mixBatchOutputs: Map<String, MixBatchOutput>
+    ): Boolean {
+        for ((serverId, mixBatch) in mixBatchOutputs) {
+            // Each mix batch should contain an Ed25519 public key for the mixer.
             val mixerKey = mixBatch.ed25519PublicKey ?: return false
-            // Compare the encoded public keys
+            // Convert the mixer's public key to a string representation.
             val mixerKeyEncoded = mixerKey.encoded.contentToString()
-            val isAuthorized = authorizedMixers.any { it.encoded.contentToString() == mixerKeyEncoded }
+            // Check if the mixer's public key exists among the authorized mixers.
+            val isAuthorized = authorizedMixers.values.any { it.encoded.contentToString() == mixerKeyEncoded }
             if (!isAuthorized) return false
         }
         return true
     }
+
 
     /**
      * Test 4: Verifies that the signed encrypted vote list is authentic.

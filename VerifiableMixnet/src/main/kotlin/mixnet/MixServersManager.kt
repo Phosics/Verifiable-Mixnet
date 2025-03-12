@@ -4,6 +4,7 @@ import bulltinboard.BulletinBoard
 import kotlinx.coroutines.*
 import org.apache.logging.log4j.LogManager
 import org.bouncycastle.crypto.params.ECDomainParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import java.security.PublicKey
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
@@ -76,4 +77,10 @@ class MixServersManager(
         val executor = Executors.newSingleThreadExecutor(threadFactory)
         return executor.asCoroutineDispatcher()
     }
+
+
+    fun getAllPublicKeys(): Map<String, Ed25519PublicKeyParameters> {
+        return mixServers.associate { it.getIndex().toString() to it.ed25519PublicKey }
+    }
+
 }
