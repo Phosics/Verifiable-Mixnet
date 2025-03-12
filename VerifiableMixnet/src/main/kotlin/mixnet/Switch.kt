@@ -1,18 +1,12 @@
-package org.example.mixnet
+package mixnet
 
-import com.google.protobuf.ByteString
-import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.BigIntegerUtils
-import org.example.crypto.CryptoConfig
-import org.example.crypto.CryptoUtils
-import org.example.mixnet.ZKPUtils
+import crypto.BigIntegerUtils
+import crypto.CryptoUtils
 import java.math.BigInteger
-import java.nio.ByteBuffer
 import java.util.function.Function
 import java.security.PublicKey
-import java.security.SecureRandom
 
 /**
  * A 2×2 Switch that either reverses or keeps the order of two votes.
@@ -28,7 +22,6 @@ class Switch(
     private var b = 0
     var zkp: Mixing.Mix2Proof? = null
     var zkpOrProof: ZKPOrProof? = null
-    // TODO: serialize the zkpOrProof into a protobuf message
 
 
     /**

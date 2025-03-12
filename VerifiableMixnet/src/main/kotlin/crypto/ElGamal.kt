@@ -1,10 +1,8 @@
-package org.example.crypto
+package crypto
 
 import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.ConcreteCrypto.GroupElement
-import meerkat.protobuf.groupElement
-import meerkat.protobuf.rerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import org.bouncycastle.jce.interfaces.ECPrivateKey
@@ -14,9 +12,7 @@ import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
 import java.security.spec.X509EncodedKeySpec
-import java.security.spec.PKCS8EncodedKeySpec
 import java.math.BigInteger
-import java.util.*
 
 /**
  * ElGamal provides encryption, decryption, and rerandomization functionalities using the EC-ElGamal scheme.
@@ -71,7 +67,6 @@ object ElGamal {
 
         // Choose random k ∈ [1, n-1]
         val k = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
-//        val k = BigInteger("85098657798640155475655463434994114077873568100739976688451492674567138052374", 10)
         println("k: $k")
 
         println("q x: ${qPoint.xCoord}")
@@ -173,7 +168,8 @@ object ElGamal {
 
         // Choose new random k' ∈ [1, n-1]
         var kPrime = r
-        if (r == BigInteger.ZERO) {kPrime = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)}
+        if (r == BigInteger.ZERO) {kPrime = BigIntegerUtils.randomBigInteger(domainParameters.n, secureRandom)
+        }
 
         // Compute new C1' = C1 + k' * G
         val newC1: ECPoint = c1.add(domainParameters.g.multiply(kPrime)).normalize()

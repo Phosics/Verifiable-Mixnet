@@ -1,8 +1,8 @@
 package mixnet
 
-import Ed25519Utils
 import bulltinboard.BulletinBoard
 import bulltinboard.TIMEOUT
+import crypto.Ed25519Utils
 import kotlinx.coroutines.delay
 import meerkat.protobuf.Mixing
 import org.apache.logging.log4j.LogManager

@@ -1,12 +1,9 @@
-package org.example.mixnet
+package mixnet
 
-import kotlinx.serialization.Contextual
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import org.example.crypto.ElGamal
+import crypto.ElGamal
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.CryptoUtils
+import crypto.CryptoUtils
 import java.math.BigInteger
 import java.security.PublicKey
 

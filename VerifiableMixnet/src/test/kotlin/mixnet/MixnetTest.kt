@@ -5,10 +5,10 @@
 //import org.bouncycastle.asn1.x9.DomainParameters
 //import org.bouncycastle.crypto.params.ECDomainParameters
 //import org.bouncycastle.jce.provider.BouncyCastleProvider
-//import org.example.crypto.CryptoConfig
-//import org.example.crypto.ElGamal
-//import org.example.mixnet.Vote
-//import org.example.mixnet.MixBatchOutput
+//import crypto.CryptoConfig
+//import crypto.ElGamal
+//import mixnet.Vote
+//import mixnet.MixBatchOutput
 //import org.example.mixnet.Verifier
 //import java.security.KeyPair
 //import java.security.PublicKey

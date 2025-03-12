@@ -2,12 +2,7 @@ package mixnet
 
 import bulltinboard.BulletinBoard
 import org.apache.logging.log4j.LogManager
-import org.bouncycastle.asn1.x9.DomainParameters
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.CryptoConfig
-import org.example.crypto.CryptoUtils
-import org.example.mixnet.MixBatchOutputVerifier
-import org.example.mixnet.Vote
 import java.security.PublicKey
 
 class VotesReceiver {

@@ -15,10 +15,9 @@ import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.example.mixnet.Vote
+import mixnet.Vote
 import java.security.SecureRandom
 import java.security.Security
-import kotlin.math.log2
 
 // --------------------------------------------------
 // 1) Minimal domain-parameter config & utilities

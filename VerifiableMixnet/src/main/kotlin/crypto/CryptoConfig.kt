@@ -1,6 +1,5 @@
-package org.example.crypto
+package crypto
 
-import org.bouncycastle.asn1.x9.X9ECParameters
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.interfaces.ECPrivateKey
@@ -49,18 +48,6 @@ object CryptoConfig {
             ecParams.seed
         )
     }
-
-    /**
-     * The size of the private key in bits.
-     * For secp256r1, the private key size is 256 bits.
-     */
-    val privateKeySize: Int = ecDomainParameters.n.bitLength()
-
-    /**
-     * The size of the public key in bytes.
-     * For compressed points, it's typically 33 bytes for secp256r1.
-     */
-    val publicKeySize: Int = 33 // Compressed form: 1 byte prefix + 32 bytes x-coordinate
 
     /**
      * Generates a new EC key pair using the specified curve.
@@ -152,27 +139,4 @@ object CryptoConfig {
         return keyFactory.generatePublic(keySpec)
     }
 
-    /**
-     * Encodes an EC private key into DER format.
-     *
-     * @param privateKey The EC private key to encode.
-     * @return A byte array containing the DER-encoded private key.
-     */
-    fun encodePrivateKeyDER(privateKey: PrivateKey): ByteArray {
-        return privateKey.encoded
-    }
-
-    /**
-     * Decodes a DER-encoded private key into an EC PrivateKey object.
-     *
-     * @param encodedPrivateKey The DER-encoded private key bytes.
-     * @return The PrivateKey object.
-     * @throws NoSuchAlgorithmException if the EC algorithm is not available.
-     * @throws InvalidKeySpecException if the key specification is invalid.
-     */
-    fun decodePrivateKeyDER(encodedPrivateKey: ByteArray): PrivateKey {
-        val keyFactory = KeyFactory.getInstance("EC", "BC")
-        val keySpec = java.security.spec.PKCS8EncodedKeySpec(encodedPrivateKey)
-        return keyFactory.generatePrivate(keySpec)
-    }
 }

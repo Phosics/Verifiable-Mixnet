@@ -5,9 +5,9 @@ import mixnet.MixServersManager
 import mixnet.VotesReceiver
 import org.apache.logging.log4j.LogManager
 import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.example.crypto.CryptoConfig
-import org.example.crypto.ThresholdCryptoConfig
-import org.example.crypto.ThresholdDecryptionResult
+import crypto.CryptoConfig
+import crypto.ThresholdCryptoConfig
+import crypto.ThresholdDecryptionResult
 import java.security.SecureRandom
 import java.security.Security
 

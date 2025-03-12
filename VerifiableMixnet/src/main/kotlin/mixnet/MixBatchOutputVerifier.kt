@@ -1,10 +1,10 @@
-package org.example.mixnet
+package mixnet
 
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Crypto
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.CryptoUtils
+import crypto.CryptoUtils
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.security.PublicKey
@@ -304,6 +304,9 @@ class MixBatchOutputVerifier(
         return e
     }
 
+    /*
+    * Deserialization functions for Mixnet protobuf messages
+    */
     private fun deserializeZKP(mix2Proof: Mixing.Mix2Proof): ZKPOrProof {
         val proofA = ZKPAndProof(
             proof1 = SchnorrProofDL(
@@ -340,6 +343,7 @@ class MixBatchOutputVerifier(
         )
     }
 
+    // Helper function to convert a protobuf BigInteger to a Java BigInteger
     private fun meerkat.protobuf.Crypto.BigInteger.toBigInteger(): BigInteger {
         return BigInteger(this.data.toByteArray())
     }

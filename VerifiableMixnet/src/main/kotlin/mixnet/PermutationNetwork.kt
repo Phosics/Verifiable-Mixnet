@@ -2,8 +2,6 @@ package mixnet
 
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.mixnet.Switch
-import org.example.mixnet.Vote
 import java.security.PublicKey
 
 
@@ -72,6 +70,9 @@ class PermutationNetwork(
         require(votes.size == n) { "apply() requires exactly n=$n votes, but got ${votes.size}" }
     }
 
+    /**
+     * Handles the base case of n=2.
+     */
     private fun handleBaseCase(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
         // Initialize the ciphertextsMatrix with two rows, each containing one vote
         val ciphertextsMatrix = mutableListOf(
@@ -95,6 +96,9 @@ class PermutationNetwork(
         return Triple(switchedVotes, ciphertextsMatrix, proofsMatrix)
     }
 
+    /*
+        * Handles the recursive case of n > 2.
+     */
     private fun handleRecursiveCase(votes: List<Vote>): Triple<List<Vote>, List<List<Vote>>, List<List<Mixing.Mix2Proof>>> {
         // Initialize the ciphertextsMatrix with n rows, each containing one vote (first column)
         val ciphertextsMatrix = votes.map { mutableListOf(it) }.toMutableList()

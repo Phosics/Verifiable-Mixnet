@@ -1,4 +1,4 @@
-package org.example.crypto
+package crypto
 
 import meerkat.protobuf.ConcreteCrypto
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
@@ -6,8 +6,8 @@ import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import org.bouncycastle.math.ec.ECPoint
-import org.example.mixnet.SchnorrProofDL
-import org.example.mixnet.ZKPUtils
+import mixnet.SchnorrProofDL
+import mixnet.ZKPUtils
 import java.lang.StringBuilder
 import java.math.BigInteger
 import java.security.KeyFactory

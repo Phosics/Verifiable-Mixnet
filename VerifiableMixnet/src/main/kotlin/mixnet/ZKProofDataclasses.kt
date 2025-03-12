@@ -1,4 +1,4 @@
-package org.example.mixnet
+package mixnet
 
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import java.math.BigInteger

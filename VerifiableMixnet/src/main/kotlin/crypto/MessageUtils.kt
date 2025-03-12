@@ -1,4 +1,4 @@
-package org.example.crypto
+package crypto
 
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint

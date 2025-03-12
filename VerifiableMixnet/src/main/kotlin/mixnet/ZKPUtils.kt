@@ -1,11 +1,11 @@
-package org.example.mixnet
+package mixnet
 
 import com.google.protobuf.ByteString
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.ECDomainParameters
-import org.example.crypto.BigIntegerUtils
-import org.example.crypto.CryptoUtils
+import crypto.BigIntegerUtils
+import crypto.CryptoUtils
 import java.io.ByteArrayOutputStream
 import java.math.BigInteger
 import java.security.PublicKey
@@ -198,14 +198,6 @@ object ZKPUtils {
             .subtract(XPoint.multiply(fakeChallenge)).normalize()
         val A_hPoint = hPoint.multiply(zFake)
             .subtract(YPoint.multiply(fakeChallenge)).normalize()
-
-//        println("A_gPoint: ${A_gPoint}")
-//        println("g: ${domainParameters.g}")
-//        println("zFake: ${zFake}")
-//        println("fakeChallenge: ${fakeChallenge}")
-//        println("XPoint: ${XPoint}")
-//        println("c1Point: ${c1Point}")
-//        println("a1Point: ${a1Point}\n")
 
         return SchnorrCommitFake(
             A_g = CryptoUtils.serializeGroupElement(A_gPoint),

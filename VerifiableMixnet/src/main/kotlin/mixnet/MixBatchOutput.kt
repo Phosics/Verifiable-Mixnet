@@ -1,9 +1,8 @@
-package org.example.mixnet
+package mixnet
 
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import meerkat.protobuf.Mixing
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
-import java.io.OutputStream
 
 
 /**
@@ -84,27 +83,8 @@ data class MixBatchOutput(
     }
 
     /**
-     * Serializes the MixBatchOutput to the given OutputStream using writeDelimitedTo().
+     * getter for the votes
      */
-    fun serialize(outputStream: OutputStream) {
-        // Write MixBatchHeader
-        MixerUtils.writeMixBatchHeader(header, outputStream)
-
-        // Write Ciphertexts Matrix column by column
-        ciphertextsMatrix.forEach { column ->
-            column.forEach { ciphertext ->
-                MixerUtils.writeCiphertexts(listOf(ciphertext), outputStream)
-            }
-        }
-
-        // Write Proofs Matrix column by column
-        proofsMatrix.forEach { column ->
-            column.forEach { proof ->
-                MixerUtils.writeProofs(listOf(proof), outputStream)
-            }
-        }
-    }
-
     fun getVotes() : List<Vote> {
         return ciphertextsMatrix.map { it.last() }.map { Vote(it) }
     }

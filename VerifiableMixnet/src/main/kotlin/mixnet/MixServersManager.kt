@@ -78,7 +78,11 @@ class MixServersManager(
         return executor.asCoroutineDispatcher()
     }
 
-
+    /**
+     * Retrieves the public keys of all MixServers.
+     *
+     * @return A map of MixServer indices to their respective public keys.
+     */
     fun getAllPublicKeys(): Map<String, Ed25519PublicKeyParameters> {
         return mixServers.associate { it.getIndex().toString() to it.ed25519PublicKey }
     }

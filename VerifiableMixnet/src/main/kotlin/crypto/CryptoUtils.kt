@@ -1,16 +1,13 @@
-package org.example.crypto
+package crypto
 
 import com.google.protobuf.ByteString
 import meerkat.protobuf.ConcreteCrypto.ElGamalCiphertext
 import meerkat.protobuf.ConcreteCrypto.GroupElement
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
-import meerkat.protobuf.groupElement
-import meerkat.protobuf.rerandomizableEncryptedMessage
 import org.bouncycastle.asn1.ASN1InputStream
 import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.math.ec.ECPoint
-import org.bouncycastle.util.encoders.Hex
 import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.jce.interfaces.ECPublicKey
 import java.math.BigInteger
@@ -106,19 +103,6 @@ object CryptoUtils {
         return ElGamalCiphertext.parseFrom(encryptedMessage.data.toByteArray())
     }
 
-    /**
-     * Deserializes a GroupElement protobuf message into an ECPoint.
-     */
-    fun deserializeGroupElementBytes(groupElement: GroupElement, domainParameters: ECDomainParameters): ECPoint {
-        return domainParameters.curve.decodePoint(groupElement.data.toByteArray())
-    }
-
-    /**
-     * Serializes an ECPoint into a byte array.
-     */
-    fun serializeECPointBytes(point: ECPoint): ByteArray {
-        return point.getEncoded(false)
-    }
 
     /**
      * Hashes the input byte array using SHA-256 and converts to BigInteger.
@@ -143,30 +127,6 @@ object CryptoUtils {
         } else {
             throw IllegalArgumentException("PublicKey is not an instance of ECPublicKey")
         }
-    }
-
-    fun signData(data : String, privateKey: PrivateKey) : String {
-        // Create a Signature instance using SHA256 with RSA algorithm
-        val signature = Signature.getInstance("SHA256withRSA")
-        signature.initSign(privateKey)
-        signature.update(data.toByteArray(Charsets.UTF_8))
-
-        // Generate the digital signature
-        val signedBytes = signature.sign()
-
-        // Encode the signature (e.g., using Base64) for easier storage/transmission
-        return Base64.getEncoder().encodeToString(signedBytes)
-    }
-
-    fun verifySignature(data : String, signatureStr : String, publicKey: PublicKey) : Boolean {
-        val signature = Signature.getInstance("SHA256withRSA")
-        signature.initVerify(publicKey)
-        signature.update(data.toByteArray(Charsets.UTF_8))
-
-        // Decode the signature from Base64
-        val signatureBytes = Base64.getDecoder().decode(signatureStr)
-
-        return signature.verify(signatureBytes)
     }
 
     /**

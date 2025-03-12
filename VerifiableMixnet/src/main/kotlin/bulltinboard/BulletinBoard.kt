@@ -10,9 +10,9 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
-import org.example.crypto.CryptoUtils
-import org.example.mixnet.MixBatchOutput
-import org.example.mixnet.Vote
+import crypto.CryptoUtils
+import mixnet.MixBatchOutput
+import mixnet.Vote
 import java.security.PublicKey
 import java.security.interfaces.ECPublicKey
 import java.util.*

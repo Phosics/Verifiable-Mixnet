@@ -7,12 +7,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.security.Security
 import java.util.Random
-import org.example.crypto.CryptoConfig
-import org.example.crypto.CryptoUtils
-import org.example.crypto.ElGamal
-import org.example.crypto.ThresholdCryptoConfig
-import org.example.mixnet.MixBatchOutputVerifier
-import org.example.mixnet.SchnorrProofDL
+import mixnet.MixBatchOutputVerifier
+import mixnet.SchnorrProofDL
 import java.io.ByteArrayOutputStream
 import java.security.SecureRandom
 import kotlin.test.assertTrue

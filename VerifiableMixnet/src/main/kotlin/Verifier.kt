@@ -1,12 +1,11 @@
 import bulltinboard.BulletinBoardVotes
-import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
+import crypto.Ed25519Utils
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
-import org.example.crypto.CryptoUtils
-import org.example.crypto.ThresholdDecryptionResult
-import org.example.mixnet.MixBatchOutput
-import org.example.mixnet.MixBatchOutputVerifier
-import org.example.mixnet.Vote
+import crypto.ThresholdDecryptionResult
+import mixnet.MixBatchOutput
+import mixnet.MixBatchOutputVerifier
+import mixnet.Vote
 import java.security.MessageDigest
 import java.security.PublicKey
 

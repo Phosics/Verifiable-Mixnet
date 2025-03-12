@@ -1,8 +1,13 @@
+package crypto
+
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
 import org.bouncycastle.crypto.signers.Ed25519Signer
-import org.example.mixnet.MixBatchOutput
+import mixnet.MixBatchOutput
 
+/**
+ * Utility for Ed25519 sign/verify of a "MixBatchOutput".
+ */
 object Ed25519Utils {
 
     /**
@@ -30,28 +35,6 @@ object Ed25519Utils {
         signedBatch.setSignature(signature)
 
         return signedBatch
-    }
-
-    /**
-     * Verify the MixBatchOutput's signature using the provided Ed25519 public key.
-     */
-    fun verifyMixBatchOutput(
-        batch: MixBatchOutput,
-        publicKey: Ed25519PublicKeyParameters
-    ): Boolean {
-        val sig = batch.getSignature()
-
-        // 1) Serialize "core data"
-        val unsignedBatch = batch.copy()
-        val bytesToCheck = createCanonicalBytes(unsignedBatch)
-
-        // 2) Create verifier
-        val verifier = Ed25519Signer()
-        verifier.init(false, publicKey)
-        verifier.update(bytesToCheck, 0, bytesToCheck.size)
-
-        // 3) Verify signature
-        return verifier.verifySignature(sig)
     }
 
     // This function constructs a canonical byte representation

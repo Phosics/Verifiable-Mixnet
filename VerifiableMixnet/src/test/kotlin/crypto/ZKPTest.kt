@@ -4,13 +4,10 @@ import crypto.ElGamalTest.MAX_MESSAGE_LENGTH
 import crypto.ElGamalTest.MIN_MESSAGE_LENGTH
 import crypto.ElGamalTest.generateRandomAsciiString
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
-import org.example.crypto.CryptoConfig
-import org.example.crypto.CryptoUtils
-import org.example.crypto.ElGamal
-import org.example.mixnet.Switch
-import org.example.mixnet.MixBatchOutputVerifier
-import org.example.mixnet.Vote
-import org.example.mixnet.ZKPUtils
+import mixnet.Switch
+import mixnet.MixBatchOutputVerifier
+import mixnet.Vote
+import mixnet.ZKPUtils
 import java.security.SecureRandom
 
 class ZKPTest {
