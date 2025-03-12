@@ -1,6 +1,8 @@
+import bulltinboard.BulletinBoardVotes
 import meerkat.protobuf.Crypto.RerandomizableEncryptedMessage
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.example.crypto.CryptoUtils
 import org.example.crypto.ThresholdDecryptionResult
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.MixBatchOutputVerifier
@@ -37,8 +39,8 @@ class Verifier() {
      * @param signingKey The public key used for signing (typically the BB's public key).
      * @return True if the signature is valid; false otherwise.
      */
-    fun test2_VerifyBBParametersSignature(parametersData: String, signature: String, signingKey: Ed25519PublicKeyParameters): Boolean {
-        return Ed25519Utils.verifySignature(parametersData.toByteArray(), signature.toByteArray(), signingKey)
+    fun test2_VerifyBBParametersSignature(parametersData: String, signature: ByteArray, signingKey: Ed25519PublicKeyParameters): Boolean {
+        return Ed25519Utils.verifySignature(parametersData.toByteArray(), signature, signingKey)
     }
 
     /**
@@ -73,9 +75,13 @@ class Verifier() {
      * @param signingKey The public key used for signing (e.g., BB's public key).
      * @return True if the signature is valid; false otherwise.
      */
-    fun test4_VerifyEncryptedVoteListSignature(voteListData: List<Vote>, signature: String, signingKey: Ed25519PublicKeyParameters): Boolean {
-//        return Ed25519Utils.verifySignature(voteListData, signature.toByteArray(), signingKey)
-        return true
+    fun test4_VerifyEncryptedVoteListSignature(votes: BulletinBoardVotes, signature: ByteArray, signingKey: Ed25519PublicKeyParameters): Boolean {
+        val concatenatedChoices = votes.votes.map { it.choice }.joinToString("")
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(concatenatedChoices.toByteArray(Charsets.UTF_8))
+        //val hashString = hashBytes.joinToString("") { "%02x".format(it) }
+
+        return Ed25519Utils.verifySignature(hashBytes, signature, signingKey)
     }
 
     /**
@@ -98,7 +104,7 @@ class Verifier() {
     }
 
     /**
-     * Test 6: Verifies that the first mixer's input equals the signed encrypted vote list.
+     * Test 7: Verifies that the first mixer's input equals the signed encrypted vote list.
      *
      * @param firstMixBatch The first mix batch output.
      * @param encryptedVotes The list of original encrypted votes (as RerandomizableEncryptedMessage).
@@ -113,7 +119,7 @@ class Verifier() {
 
 
     /**
-     * Test 7: Verifies the mixing chain consistency across all mix batches.
+     * Test 8: Verifies the mixing chain consistency across all mix batches.
      *
      * @param mixBatchOutputs List of mix batch outputs.
      * @return True if each batch's output equals the next batch's input; false otherwise.
@@ -127,7 +133,10 @@ class Verifier() {
                 continue
             }
 
-            if (mixBatchOutputs[i.toString()]!!.getVotes() != mixBatchOutputs[prevIndex.toString()]!!.getVotes()) {
+            val prevBatch = mixBatchOutputs[prevIndex.toString()]!!.ciphertextsMatrix.map { it.last() }
+            val currentBatch = mixBatchOutputs[i.toString()]!!.ciphertextsMatrix.map { it.first() }
+
+            if (currentBatch.toSet() != prevBatch.toSet()) {
                 return false
             }
 
@@ -137,7 +146,7 @@ class Verifier() {
     }
 
     /**
-     * Test 8: Verifies the Zero-Knowledge Proofs (ZKPs) of the mixing process.
+     * Test 6: Verifies the Zero-Knowledge Proofs (ZKPs) of the mixing process.
      *
      * @param mixBatchOutputs List of mix batch outputs.
      * @return True if all ZKPs in each mix batch output are valid; false otherwise.

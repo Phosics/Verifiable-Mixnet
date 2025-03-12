@@ -1,5 +1,6 @@
 import bulltinboard.BulletinBoard
 import bulltinboard.TIMEOUT
+import bulltinboard.VerifierResult
 import mixnet.MixServersManager
 import mixnet.VotesReceiver
 import org.apache.logging.log4j.LogManager
@@ -9,7 +10,6 @@ import org.example.crypto.ThresholdCryptoConfig
 import org.example.crypto.ThresholdDecryptionResult
 import java.security.SecureRandom
 import java.security.Security
-import kotlin.math.log
 
 class Server {
     private val logger = LogManager.getLogger(Server::class.java)
@@ -36,7 +36,7 @@ class Server {
 
             logger.info("Closing older polls...")
             bulletinboard.endMix()
-            bulletinboard.sendResults()
+            bulletinboard.sendResults(emptyList(), emptyList(), emptyMap())
 
             logger.info("Waiting for voting to finish...")
             var startMix = bulletinboard.startMix()
@@ -56,7 +56,7 @@ class Server {
             Thread.sleep(1 * 1000)
 
             logger.info("Starting to mix...")
-            val serversManager = MixServersManager(publicKey, domainParameters, 0, bulletinboard, startMix.pollId)
+            val serversManager = MixServersManager(publicKey, domainParameters, config.mixServersMalicious, bulletinboard, startMix.pollId)
             serversManager.runServers()
             Thread.sleep((serversManager.getAmountOfServers() * (TIMEOUT + 1)).toLong())
 
@@ -74,8 +74,6 @@ class Server {
                 thresholdResults.add(thresholdResult)
             }
 
-            // TODO: run verifier on everyting, send the result of the verifier
-
             logger.info("Running verifier...")
 
             val verifier = Verifier()
@@ -86,7 +84,7 @@ class Server {
             logger.info("Test 1 Result: $BBKeyHash")
 
             // test2: Verifies that the Bulletin Board's general parameters block is authentic.
-            val test2Result = verifier.test2_VerifyBBParametersSignature(config.toString(), bulletinboard.getbbConfigSigniture(), config.getPublicKey())
+            val test2Result = verifier.test2_VerifyBBParametersSignature(config.toString(), bulletinboard.getConfigSignature(), config.getPublicKey())
             logger.info("Test 2 Result: $test2Result")
 
             // test3: Verifies that each mix batch output is produced by an authorized mix server.
@@ -94,7 +92,7 @@ class Server {
             logger.info("Test 3 Result: $test3Result")
 
             // test4: Verifies that the signed encrypted vote list is authentic.
-            val test4Result = verifier.test4_VerifyEncryptedVoteListSignature(bulletinboard.votes, bulletinboard.votesSignature, config.getPublicKey())
+            val test4Result = verifier.test4_VerifyEncryptedVoteListSignature(bulletinboard.rawVotes, bulletinboard.votesSignature, config.getPublicKey())
             logger.info("Test 4 Result: $test4Result")
 
             // test5: Verifies that each mix batch output is correctly signed.
@@ -118,11 +116,22 @@ class Server {
             val test9Result = verifier.test9_VerifyDecryptionZKP(thresholdResults)
             logger.info("Test 9 Result: $test9Result")
 
-//            logger.info("decrypted vote ${thresholdResult.message}")
+            val verifierResults : MutableList<VerifierResult> = mutableListOf()
+            verifierResults.add(VerifierResult(1, BBKeyHash))
+            verifierResults.add(VerifierResult(2, test2Result.toString()))
+            verifierResults.add(VerifierResult(3, test3Result.toString()))
+            verifierResults.add(VerifierResult(4, test4Result.toString()))
+            verifierResults.add(VerifierResult(5, test5Result.toString()))
+            verifierResults.add(VerifierResult(6, test6Result.size.toString()))
+            verifierResults.add(VerifierResult(7, test7Result.toString()))
+            verifierResults.add(VerifierResult(8, test8Result.toString()))
+            verifierResults.add(VerifierResult(9, test9Result.toString()))
 
-//            val results = thresholdResults.map { it.message }.groupingBy { it }.eachCount()
+            val results = thresholdResults.filter { it!!.message != "null" }.map { it!!.message }.groupingBy { it }.eachCount()
+            val proofs = thresholdResults.filter { it!!.message != "null" }.map {it!!.toStringProofs()}
 
-            // TODO: send results - only if verifier is ok
+            logger.info("Posting the results")
+            bulletinboard.sendResults(verifierResults, proofs, results)
         }
 
     }

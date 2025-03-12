@@ -8,6 +8,7 @@ import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec
 import org.bouncycastle.math.ec.ECPoint
 import org.example.mixnet.SchnorrProofDL
 import org.example.mixnet.ZKPUtils
+import java.lang.StringBuilder
 import java.math.BigInteger
 import java.security.KeyFactory
 import java.security.SecureRandom
@@ -22,7 +23,25 @@ import java.util.concurrent.LinkedBlockingQueue
 data class ThresholdDecryptionResult(
     val message: String,
     val proofs: List<Pair<Int, SchnorrProofDL>>
-)
+) {
+    fun toStringProofs(): String {
+        val builder = StringBuilder()
+
+        builder.append("{")
+        for (pair in proofs) {
+            builder.append("<")
+            builder.append(pair.first)
+            builder.append(",")
+            builder.append(pair.second.toString())
+            builder.append(">")
+            builder.append(";")
+        }
+
+        builder.append("}")
+
+        return builder.toString()
+    }
+}
 
 /**
  * ThresholdCryptoConfig provides threshold key generation and decryption (with attached proofs)

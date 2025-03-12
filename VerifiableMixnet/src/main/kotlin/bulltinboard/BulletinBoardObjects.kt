@@ -50,18 +50,6 @@ data class BulletinBoardVotes (
     @SerialName("signedHashedEncryptedVotes")
     val signedHashedEncryptedVotes: String
 ) {
-    fun verifyVotes(publicKey: PublicKey) : List<BulletinBoardVote> {
-        val failed : MutableList<BulletinBoardVote> = mutableListOf()
-
-        for (vote in votes) {
-            if(!vote.verifySignature(publicKey)) {
-                failed.add(vote)
-            }
-        }
-
-        return failed
-    }
-
     fun extractVotes() : List<Vote> {
         val mixnetVotes : MutableList<Vote> = mutableListOf()
 
@@ -88,12 +76,7 @@ data class BulletinBoardVote (
     val userId: String,
     @SerialName("signedEncryptedVote")
     val signedEncryptedVote: String
-) {
-    fun verifySignature(publicKey : PublicKey) : Boolean {
-        // TODO: Fill
-        return true
-    }
-}
+)
 
 @Serializable
 data class BulletinBoardData (
@@ -174,7 +157,7 @@ data class BulletinBoardMixBatchOutputRecord(
         val header = mixBatchOutput.decodeHeader(decoder)
         val ciphertextsMatrix = mixBatchOutput.decodeCiphertextsMatrix(decoder)
         val proofsMatrix = mixBatchOutput.decodeProofsMatrix(decoder)
-        val signature = signature.toByteArray()
+        val signature = CryptoUtils.hexStringToByteArray(signature)
         val publicKey = base64ToEd25519PublicKey(publicKey)
 
         val mixBatch = MixBatchOutput(header, ciphertextsMatrix, proofsMatrix, publicKey)
@@ -214,9 +197,15 @@ data class BulletinBoardMixBatchOutputs(
 
 @Serializable
 data class Results(
-    val verifierResults: String,
-    val decryptionServersProofs: String,
-    val finalPollResults: String
+    val verifierResults: List<VerifierResult>,
+    val decryptionServersProofs: List<String>,
+    val finalPollResults: Map<String, Int>
+)
+
+@Serializable
+data class VerifierResult(
+    val testIndex: Int,
+    val message: String
 )
 
 @Serializable
@@ -258,7 +247,6 @@ data class BulletinBoardConfig(
         return Json.encodeToString(this)
     }
 }
-
 
 @Serializable
 data class BulletinBoardConfigData(

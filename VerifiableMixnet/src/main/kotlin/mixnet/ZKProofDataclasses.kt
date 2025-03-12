@@ -10,7 +10,11 @@ data class SchnorrProofDL(
     val A_g: GroupElement, // Commitment A_g = g^t
     val A_h: GroupElement, // Commitment A_h = h^t
     val z: BigInteger      // Response z = t + c * r mod q
-)
+) {
+    override fun toString(): String {
+        return "$A_g:$A_h:$z"
+    }
+}
 
 /**
  * Encapsulates the Schnorr proofs for both swapped outputs.

@@ -10,6 +10,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.example.crypto.CryptoUtils
 import org.example.mixnet.MixBatchOutput
 import org.example.mixnet.Vote
 import java.security.PublicKey
@@ -28,7 +29,8 @@ class BulletinBoard() {
     val localhost = "http://localhost:3000/api"
     var numberOfVotes : Int = 0
     var votes : List<Vote> = mutableListOf()
-    var votesSignature: String = ""
+    lateinit var votesSignature: ByteArray
+    lateinit var rawVotes: BulletinBoardVotes
 
     val client : HttpClient = HttpClient(CIO) {
         install(ContentNegotiation) {
@@ -37,17 +39,18 @@ class BulletinBoard() {
     }
 
     fun loadVotes() {
-        val bulletinBoardVotes = sendGetRequest<BulletinBoardVotes>("$localhost/votes")
-        votes = bulletinBoardVotes.extractVotes()
+        rawVotes = sendGetRequest<BulletinBoardVotes>("$localhost/votes")
+        votes = rawVotes.extractVotes()
         numberOfVotes = 2.0.pow(ceil(log2(votes.size.toDouble())).toInt()).toInt()
-        votesSignature = bulletinBoardVotes.signedHashedEncryptedVotes
+        votesSignature = CryptoUtils.hexStringToByteArray(rawVotes.signedHashedEncryptedVotes)
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     fun sendMixBatchOutput(index : Int, pollID: String, mixBatch : MixBatchOutput) {
         val header = toBase64(mixBatch.header)
         val cipherTextMatrix = toBase64(mixBatch.ciphertextsMatrix)
         val proofs = toBase64(mixBatch.proofsMatrix)
-        val signature = mixBatch.getSignature().decodeToString() // TODO: Hex
+        val signature = mixBatch.getSignature().toHexString()
         val publicKey = edPublicKeyToBase64(mixBatch.ed25519PublicKey)
 
         val mixBatchOutputPayload = BulletinBoardMixBatchOutput(header, cipherTextMatrix, proofs)
@@ -69,8 +72,8 @@ class BulletinBoard() {
         return config.bbConig
     }
 
-    fun getbbConfigSigniture() : String {
-        return config.bbConfigSignature
+    fun getConfigSignature() : ByteArray {
+        return CryptoUtils.hexStringToByteArray(config.bbConfigSignature)
     }
 
     fun addSignaturePublicKey(index : String, publicKey: PublicKey) {
@@ -96,8 +99,10 @@ class BulletinBoard() {
         }
     }
 
-    fun sendResults() {
-        val payload = Results("", "", "")
+    fun sendResults(verifierResults: List<VerifierResult>,
+                    decryptionServersProofs: List<String>,
+                    finalPollResults: Map<String, Int>) {
+        val payload = Results(verifierResults, decryptionServersProofs, finalPollResults)
 
         runBlocking {
             client.post("$localhost/results") {
