@@ -23,7 +23,7 @@ class MixServersManager(
     private val pollID: String
 ) {
     private val n = bulletinBoard.numberOfVotes
-    private val numServers = 2 * t + 1
+    private val numServers = t + 1
     private val logger = LogManager.getLogger(MixServersManager::class.java)
 
     private val mixServers: List<MixServer>

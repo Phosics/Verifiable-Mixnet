@@ -31,7 +31,6 @@ class Server {
             val bulletinboard = BulletinBoard()
             bulletinboard.loadBulletinBoardConfig()
             val config = bulletinboard.getConfig()
-            logger.info("JSON: $config")
 
             logger.info("Generating keys using the decryption servers...")
             val (publicKey, thresholdServers) =
